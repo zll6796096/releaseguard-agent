@@ -1,0 +1,85 @@
+name: ReleaseGuard Agent Release Gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          # Fetch depth 2 is needed so call_releaseguard.py can run git diff HEAD~1 successfully
+          fetch-depth: 2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run ReleaseGuard Agent Check
+        id: run_agent
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+          RELEASEGUARD_PREVIEW_URL: ${{ vars.RELEASEGUARD_PREVIEW_URL }}
+          RELEASEGUARD_AGENT_URL: ${{ secrets.RELEASEGUARD_AGENT_URL }}
+          RELEASEGUARD_SHARED_TOKEN: ${{ secrets.RELEASEGUARD_SHARED_TOKEN }}
+        run: |
+          if [ -z "$RELEASEGUARD_AGENT_URL" ]; then
+            echo "Error: Secrets.RELEASEGUARD_AGENT_URL is not set. Please configure this secret in repository settings."
+            exit 1
+          fi
+          python3 scripts/call_releaseguard.py
+
+      - name: Post PR Comment
+        if: always() && steps.run_agent.outcome == 'success'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const path = 'releaseguard-result.json';
+            
+            if (!fs.existsSync(path)) {
+              console.log('Result file not found, skipping comment.');
+              return;
+            }
+            
+            const result = JSON.parse(fs.readFileSync(path, 'utf8'));
+            const report = result.markdown_report;
+            const commentMarker = '<!-- releaseguard-agent-report -->';
+            const body = `${commentMarker}\n${report}`;
+            
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const existingComment = comments.find(c => c.body.includes(commentMarker));
+            
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: body
+              });
+              console.log('Updated existing PR comment.');
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+              console.log('Created new PR comment.');
+            }
