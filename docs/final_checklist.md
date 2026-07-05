@@ -13,7 +13,7 @@ This document lists all required URLs, assets, configuration parameters, and sub
 | **Demo Store Service URL** | `https://demo-store-788259830737.asia-northeast1.run.app` |
 | **ProtoPedia Submission Page**| `https://protopedia.net/prototype/<id-placeholder>` |
 | **Demonstration Video URL** | `https://www.youtube.com/watch?v=<video-id-placeholder>` |
-| **Demo Pull Request (BLOCK)** | `<final-block-demo-pr-url-placeholder>` |
+| **Demo Pull Request (BLOCK)** | `https://github.com/zll6796096/releaseguard-agent/pull/2` |
 
 ---
 

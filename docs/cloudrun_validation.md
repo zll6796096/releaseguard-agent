@@ -89,9 +89,9 @@ This report documents the deployment, configuration, and verification details of
 ---
 
 ## 🛡️ Final Code-Driven Demo PR Validation
-- **PR URL**: `<final-block-demo-pr-url-placeholder>`
-- **Preview Service URL**: `<final-preview-service-url-placeholder>`
-- **GitHub Action Run URL**: `<final-github-action-run-url-placeholder>`
+- **PR URL**: `https://github.com/zll6796096/releaseguard-agent/pull/2`
+- **Preview Service URL**: `https://demo-store-pr-hidden-788259830737.asia-northeast1.run.app`
+- **GitHub Action Run URL**: `https://github.com/zll6796096/releaseguard-agent/actions/runs/28746644766`
 - **Verdict**: `BLOCK`
 - **Risk Score**: `90`
 - **Evidence Summary**:
