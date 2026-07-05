@@ -83,3 +83,7 @@ jobs:
               });
               console.log('Created new PR comment.');
             }
+            
+            if (result.verdict === 'BLOCK' || result.verdict === 'ESCALATE') {
+              core.setFailed(`ReleaseGuard Verdict: ${result.verdict}. Failing workflow.`);
+            }

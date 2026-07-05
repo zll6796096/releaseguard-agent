@@ -81,7 +81,8 @@ class ReportGenerator:
                 "",
                 "### 📸 Playwright Screenshot Artifact",
                 f"**Path**: `{screenshot_path}`",
-                f"![Checkout Page Screenshot](file://{screenshot_path})"
+                "",
+                "<!-- TODO: Cloud Storage or artifact upload is needed to generate public URLs for screenshots in GitHub PR comments -->"
             ])
 
         lines.extend([

@@ -52,7 +52,7 @@ class SecretScan(BaseSkill):
                 category="secret_scan",
                 status="failure",
                 message=f"Detected {total_secrets} potential secret(s) in PR diff.",
-                risk_score=10,
+                risk_score=95,
                 details={"secrets_found": found_secrets}
             )]
         

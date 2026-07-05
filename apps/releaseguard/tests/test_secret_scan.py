@@ -41,7 +41,7 @@ async def test_secret_scan_detects_github_token():
     evidence = await scanner.evaluate(req)
     assert len(evidence) == 1
     assert evidence[0].status == "failure"
-    assert evidence[0].risk_score == 10
+    assert evidence[0].risk_score == 95
     assert "Detected 1 potential secret" in evidence[0].message
     assert any(sec["type"] == "github_token" for sec in evidence[0].details["secrets_found"])
 
@@ -62,5 +62,5 @@ async def test_secret_scan_detects_private_key():
     evidence = await scanner.evaluate(req)
     assert len(evidence) == 1
     assert evidence[0].status == "failure"
-    assert evidence[0].risk_score == 10
+    assert evidence[0].risk_score == 95
     assert any(sec["type"] == "private_key" for sec in evidence[0].details["secrets_found"])

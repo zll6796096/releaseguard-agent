@@ -30,36 +30,45 @@ class RiskPolicy:
 
         # Pre-assess if API probes failed
         api_failed = any(
-            item.category in ("api_health", "api_checkout") and (item.status == "failure" or item.risk_score >= 8)
+            item.category in ("api_health", "api_checkout") and (item.status == "failure" or item.risk_score >= 80)
             for item in evidence
         )
 
         # Apply specific rules
+        hard_block = False
+
         for item in evidence:
-            if item.category == "api_checkout" and (item.status == "failure" or item.risk_score >= 8):
-                verdict = "BLOCK"
+            if item.category == "api_checkout" and (item.status == "failure" or item.risk_score >= 85):
+                hard_block = True
                 triggered_rules.append("Rule: Checkout page failed or checkout button was missing/invisible (API).")
             
-            if item.category == "secret_scan" and (item.status == "failure" or item.risk_score >= 8):
-                verdict = "BLOCK"
+            if item.category == "secret_scan" and (item.status == "failure" or item.risk_score >= 95):
+                hard_block = True
                 triggered_rules.append("Rule: Secret scan detected exposed credentials or tokens in diff.")
 
             # General health check failure
-            if item.category == "api_health" and (item.status == "failure" or item.risk_score >= 8):
-                verdict = "BLOCK"
+            if item.category == "api_health" and (item.status == "failure" or item.risk_score >= 80):
+                hard_block = True
                 triggered_rules.append("Rule: Preview environment health check failed.")
 
             # Playwright probe rules
             if item.category == "playwright_probe":
-                if item.status == "fail" or item.risk_score >= 80:
-                    verdict = "BLOCK"
+                if item.status == "fail" or item.risk_score >= 90:
+                    hard_block = True
                     triggered_rules.append("Rule: Playwright journey check failed (checkout button is not visible or usable).")
                 elif item.status == "warning":
                     if api_failed:
-                        verdict = "BLOCK"
+                        hard_block = True
                         triggered_rules.append("Rule: Playwright probe could not run and API probe failed.")
                     else:
-                        # Playwright warning but API is healthy -> WARN but do not BLOCK
                         triggered_rules.append("Warning: Playwright probe could not run, but API checks passed (Proceed with caution).")
+
+        # Determine verdict based on overall risk and hard_block
+        if overall_risk >= 80 or hard_block:
+            verdict = "BLOCK"
+        elif 50 <= overall_risk <= 79:
+            verdict = "WARN"
+        else:
+            verdict = "APPROVE"
 
         return verdict, triggered_rules, overall_risk

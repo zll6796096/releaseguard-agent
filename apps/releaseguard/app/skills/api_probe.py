@@ -20,8 +20,8 @@ class ApiProbe(BaseSkill):
         from urllib.parse import urlparse, urlunparse
         parsed = urlparse(request.preview_url)
         
-        # 1. Probe /healthz (without original query params)
-        healthz_url = urlunparse((parsed.scheme, parsed.netloc, "/healthz", "", "", ""))
+        # 1. Probe /healthz/ (without original query params)
+        healthz_url = urlunparse((parsed.scheme, parsed.netloc, "/healthz/", "", "", ""))
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 res = await client.get(healthz_url)
@@ -38,7 +38,7 @@ class ApiProbe(BaseSkill):
                         category="api_health",
                         status="failure",
                         message=f"Service health check failed with status code {res.status_code}.",
-                        risk_score=10,
+                        risk_score=80,
                         details={"status_code": res.status_code, "body": res.text[:200]}
                     ))
         except Exception as e:
@@ -46,7 +46,7 @@ class ApiProbe(BaseSkill):
                 category="api_health",
                 status="failure",
                 message=f"Could not connect to health endpoint: {str(e)}",
-                risk_score=10,
+                risk_score=80,
                 details={"error": str(e)}
             ))
 
@@ -60,7 +60,7 @@ class ApiProbe(BaseSkill):
                         category="api_checkout",
                         status="failure",
                         message=f"Checkout page load failed with status code {res.status_code}.",
-                        risk_score=10,
+                        risk_score=85,
                         details={"status_code": res.status_code}
                     ))
                 else:
@@ -76,7 +76,7 @@ class ApiProbe(BaseSkill):
                             category="api_checkout",
                             status="failure",
                             message="Checkout button with data-testid='checkout-button' was not found in the DOM.",
-                            risk_score=10,
+                            risk_score=90,
                             details={"button_found": False}
                         ))
                     elif has_hidden_class:
@@ -84,7 +84,7 @@ class ApiProbe(BaseSkill):
                             category="api_checkout",
                             status="failure",
                             message="Checkout button is present in the DOM but has 'hidden-button' CSS class applied (invisible to users).",
-                            risk_score=9,
+                            risk_score=90,
                             details={"button_found": True, "invisible": True}
                         ))
                     else:
@@ -100,7 +100,7 @@ class ApiProbe(BaseSkill):
                 category="api_checkout",
                 status="failure",
                 message=f"Could not connect to checkout page: {str(e)}",
-                risk_score=10,
+                risk_score=85,
                 details={"error": str(e)}
             ))
             

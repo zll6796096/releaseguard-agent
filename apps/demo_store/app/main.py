@@ -18,6 +18,7 @@ class CheckoutRequest(BaseModel):
     card: str
 
 @app.get("/healthz")
+@app.get("/healthz/")
 def healthz():
     """Health check endpoint."""
     return {"status": "ok"}

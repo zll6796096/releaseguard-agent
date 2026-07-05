@@ -34,3 +34,6 @@ def test_report_generation():
     assert "checkout" in report
     # Contains screenshot path
     assert "/tmp/releaseguard-artifacts/checkout.png" in report
+    # Does not contain file:// and contains TODO
+    assert "file://" not in report
+    assert "TODO" in report

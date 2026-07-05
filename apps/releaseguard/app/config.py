@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     
     # Environment and Ports
     RELEASEGUARD_PORT: int = 8080
-    RELEASEGUARD_API_KEY: str = "demo-api-key-change-me"
+    RELEASEGUARD_SHARED_TOKEN: str = ""
     
     # Gemini API
     GEMINI_API_KEY: str = ""

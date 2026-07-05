@@ -15,15 +15,14 @@ Evidence → Gemini Judgement → Risk Policy → Verdict
 
 ## Evidence Categories
 
-Each evidence probe produces a score from 0 (no risk) to 10 (critical risk).
+Each evidence probe produces a score from 0 (no risk) to 100 (critical risk).
 
 | Category | Probe Type | Description |
 |---|---|---|
-| `api_health` | API probe | HTTP health check returns 200 |
-| `api_checkout` | API probe | Checkout endpoint returns valid response |
-| `ui_screenshot` | Vision probe | Gemini analyzes page screenshot for visual issues |
-| `ui_critical_elements` | Vision probe | Key UI elements (buttons, forms) are visible and usable |
-| `response_time` | API probe | Response time within acceptable range |
+| `api_health` | API probe | HTTP health check returns 200 (failure: 80) |
+| `api_checkout` | API probe | Checkout endpoint returns valid response (unavailable: 85, button missing/invisible: 90) |
+| `playwright_probe` | UI journey probe | Playwright runs headless Chromium check on checkout button visibility and layout (fail: 90, warning: 50) |
+| `secret_scan` | Security probe | Scans PR diff text for exposed credentials or private keys (failure: 95) |
 
 ---
 
@@ -33,13 +32,12 @@ Gemini returns a JSON object with:
 
 ```json
 {
-  "overall_risk": 0-10,
+  "overall_risk": 0-100,
   "category_risks": {
-    "api_health": 0-10,
-    "api_checkout": 0-10,
-    "ui_screenshot": 0-10,
-    "ui_critical_elements": 0-10,
-    "response_time": 0-10
+    "api_health": 0-100,
+    "api_checkout": 0-100,
+    "playwright_probe": 0-100,
+    "secret_scan": 0-100
   },
   "findings": [
     {
@@ -57,33 +55,12 @@ Gemini returns a JSON object with:
 
 ## Policy Rules
 
-### Rule 1: Critical Finding → BLOCK
+### Rule 1: Risk Level Thresholds
 
-If any finding has `severity == "critical"`, the verdict is **BLOCK**.
-
-> Rationale: A single critical finding (e.g., checkout button not visible) is enough to block a release.
-
-### Rule 2: Overall Risk Threshold → BLOCK
-
-If `overall_risk >= 7`, the verdict is **BLOCK**.
-
-> Rationale: High aggregate risk means too many things are wrong.
-
-### Rule 3: Any Category Risk ≥ 8 → BLOCK
-
-If any `category_risks[*] >= 8`, the verdict is **BLOCK**.
-
-> Rationale: A single category being severely broken is a release blocker.
-
-### Rule 4: Multiple High Findings → BLOCK
-
-If there are 2 or more findings with `severity == "high"`, the verdict is **BLOCK**.
-
-> Rationale: Multiple high-severity issues compound risk.
-
-### Rule 5: Otherwise → APPROVE
-
-If none of the above rules trigger, the verdict is **APPROVE**.
+The release gate uses the following risk score thresholds:
+- **`overall_risk >= 80`**: **BLOCK** the release.
+- **`50 <= overall_risk <= 79`**: **WARN** (proceed with manual validation) unless a hard policy requires **BLOCK** (e.g. if any individual critical check dictates a block).
+- **`overall_risk < 50`**: **APPROVE** the release.
 
 ---
 
@@ -92,9 +69,9 @@ If none of the above rules trigger, the verdict is **APPROVE**.
 The final verdict posted to the GitHub PR comment:
 
 ```
-## 🛡️ ReleaseGuard Verdict: {APPROVE ✅ | BLOCK 🚫}
+## 🛡️ ReleaseGuard Verdict: {APPROVE ✅ | WARN 🟡 | BLOCK 🚫}
 
-**Overall Risk Score**: {overall_risk}/10
+**Overall Risk Score**: {overall_risk}/100
 **Policy Rules Triggered**: {list of triggered rules or "None"}
 
 ### Evidence Summary
@@ -107,7 +84,7 @@ The final verdict posted to the GitHub PR comment:
 {Gemini's summary}
 
 ---
-*ReleaseGuard Agent v0.1.0 • Policy: deterministic • Judgement: Gemini Flash*
+*ReleaseGuard Agent v0.1.0 • Policy: deterministic + Gemini Synthesis*
 ```
 
 ---

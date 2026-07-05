@@ -27,7 +27,7 @@ docker-compose up --build -d
 
 echo -e "${YELLOW}Waiting for services to become healthy...${NC}"
 for i in {1..10}; do
-    HEALTH_RG=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/healthz 2>/dev/null || echo "failed")
+    HEALTH_RG=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8085/healthz 2>/dev/null || echo "failed")
     HEALTH_DS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/healthz 2>/dev/null || echo "failed")
     if [ "$HEALTH_RG" = "200" ] && [ "$HEALTH_DS" = "200" ]; then
         echo -e "${GREEN}Services are up and healthy!${NC}"
@@ -49,13 +49,13 @@ echo -e "\n${BLUE}--------------------------------------------------------------
 echo -e "${GREEN}Scenario 1: Clean Pull Request (Expected: APPROVE)${NC}"
 echo -e "${BLUE}-------------------------------------------------------------------------${NC}"
 
-CLEAN_RESPONSE=$(curl -s -X POST http://localhost:8080/evaluate \
+CLEAN_RESPONSE=$(curl -s -X POST http://localhost:8085/evaluate \
   -H "Content-Type: application/json" \
   -d '{
     "repo": "owner/releaseguard-agent",
     "pr_number": 42,
     "commit_sha": "f00b4r123",
-    "preview_url": "http://demo_store:8081",
+    "preview_url": "http://demo_store:8080",
     "changed_files": ["app/main.py"],
     "diff_text": "diff --git a/app/main.py b/app/main.py\nindex 123..456 100644\n--- a/app/main.py\n+++ b/app/main.py\n@@ -1,2 +1,2 @@\n-print(\"old\")\n+print(\"new\")"
   }')
@@ -67,16 +67,37 @@ echo -e "\n${GREEN}Generated Markdown Report:${NC}"
 echo "$CLEAN_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin)['markdown_report'])"
 
 echo -e "\n${BLUE}-------------------------------------------------------------------------${NC}"
-echo -e "${RED}Scenario 2: Leaked Credentials / Secrets PR (Expected: BLOCK)${NC}"
+echo -e "${RED}Scenario 2: Hidden Checkout (Expected: BLOCK >=90)${NC}"
 echo -e "${BLUE}-------------------------------------------------------------------------${NC}"
 
-SECRET_RESPONSE=$(curl -s -X POST http://localhost:8080/evaluate \
+HIDDEN_RESPONSE=$(curl -s -X POST http://localhost:8085/evaluate \
   -H "Content-Type: application/json" \
   -d '{
     "repo": "owner/releaseguard-agent",
     "pr_number": 43,
+    "commit_sha": "def456hidden",
+    "preview_url": "http://demo_store:8080?bug=true",
+    "changed_files": ["app/templates/checkout.html"],
+    "diff_text": "diff --git a/app/templates/checkout.html b/app/templates/checkout.html\n+++ b/app/templates/checkout.html\n+<button type=\"submit\" data-testid=\"checkout-button\" class=\"btn-primary hidden-button\">"
+  }')
+
+echo -e "${RED}Response JSON:${NC}"
+echo "$HIDDEN_RESPONSE" | python3 -m json.tool
+
+echo -e "\n${RED}Generated Markdown Report:${NC}"
+echo "$HIDDEN_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin)['markdown_report'])"
+
+echo -e "\n${BLUE}-------------------------------------------------------------------------${NC}"
+echo -e "${RED}Scenario 3: Leaked Credentials / Secrets PR (Expected: BLOCK >=95)${NC}"
+echo -e "${BLUE}-------------------------------------------------------------------------${NC}"
+
+SECRET_RESPONSE=$(curl -s -X POST http://localhost:8085/evaluate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "repo": "owner/releaseguard-agent",
+    "pr_number": 44,
     "commit_sha": "abc123secret",
-    "preview_url": "http://demo_store:8081",
+    "preview_url": "http://demo_store:8080",
     "changed_files": ["config.py"],
     "diff_text": "diff --git a/config.py b/config.py\n+++ b/config.py\n+GITHUB_TOKEN = \"ghp_abcdefghijklmnopqrstuvwxyz0123456789\""
   }')

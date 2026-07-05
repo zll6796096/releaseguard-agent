@@ -42,13 +42,13 @@
 
 ---
 
-## D6: Screenshot Analysis via Gemini Vision
+## D6: Playwright Visual Probing + Gemini Evidence Synthesis
 
-**Decision**: Use Gemini's multimodal capabilities to analyze screenshots of the preview deployment.
+**Decision**: Use Playwright to visually probe the DOM and capture a screenshot, then pass the structured visual probe results (metadata) to Gemini for synthesis.
 
-**Rationale**: This is the key differentiator. Traditional CI cannot "see" the rendered page. By taking a screenshot and asking Gemini to evaluate it, we detect visual regressions like invisible buttons, broken layouts, and missing content that pass all unit tests.
+**Rationale**: Traditional CI cannot verify if elements are visually hidden or unusable. By combining Playwright visual/layout probing (e.g. checking visibility, computed styles, opacity) with Gemini's reasoning capabilities, we detect visual regressions (like invisible buttons, broken layouts, missing content) that pass naive DOM/selector checks.
 
-**Assumption**: We use a headless browser (Playwright) running inside the ReleaseGuard container to capture screenshots.
+**Assumption**: We use a headless browser (Playwright) running inside the ReleaseGuard container to perform DOM/CSS probing and capture screenshots for manual reference.
 
 ---
 

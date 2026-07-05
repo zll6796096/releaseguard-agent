@@ -46,11 +46,11 @@ Get ReleaseGuard running locally in 3 steps:
 
 ReleaseGuard is an AI agent that acts as a release gate for Cloud Run deployments. When a Pull Request is opened, ReleaseGuard:
 
-1. **Visits** the preview deployment in a headless browser.
-2. **Probes** the API endpoints (health, checkout, response times).
-3. **Screenshots** the UI and sends it to Gemini for visual analysis.
-4. **Judges** the collected evidence using Gemini's structured output.
-5. **Applies** a deterministic risk policy to produce an APPROVE or BLOCK verdict.
+1. **Visits** the preview deployment in a headless browser (Playwright) to probe UI visibility.
+2. **Probes** the API endpoints (health, checkout).
+3. **Captures** a screenshot for manual audit / reference.
+4. **Synthesizes** the collected text evidence (API health, Playwright DOM visibility findings, secret scans, and code diffs) using Gemini's structured output.
+5. **Applies** a deterministic risk policy to produce an APPROVE, WARN, or BLOCK verdict.
 6. **Posts** a detailed PR comment with evidence, scores, findings, and reasoning.
 
 ### The Demo Bug
