@@ -8,12 +8,12 @@ This document lists all required URLs, assets, configuration parameters, and sub
 
 | Submission Deliverable | Placeholder Link / URL |
 |---|---|
-| **Public GitHub Repository** | `https://github.com/<your-username>/releaseguard-agent` |
-| **ReleaseGuard Service URL** | `https://releaseguard-agent-<hash>-<region>.a.run.app` |
-| **Demo Store Service URL** | `https://demo-store-<hash>-<region>.a.run.app` |
+| **Public GitHub Repository** | `https://github.com/zll6796096/releaseguard-agent` |
+| **ReleaseGuard Service URL** | `https://releaseguard-agent-788259830737.asia-northeast1.run.app` |
+| **Demo Store Service URL** | `https://demo-store-788259830737.asia-northeast1.run.app` |
 | **ProtoPedia Submission Page**| `https://protopedia.net/prototype/<id-placeholder>` |
 | **Demonstration Video URL** | `https://www.youtube.com/watch?v=<video-id-placeholder>` |
-| **Demo Pull Request URL** | `https://github.com/<your-username>/releaseguard-agent/pull/1` |
+| **Demo Pull Request URL** | `https://github.com/zll6796096/releaseguard-agent/pull/1` |
 
 ---
 
@@ -22,7 +22,7 @@ This document lists all required URLs, assets, configuration parameters, and sub
 Include this diagram inside your submission pitch slides or submission descriptions:
 - **Diagram Path**: [docs/architecture.md](file:///Users/zhanglonglong/Projects/apps/ReleaseGuard%20Agent/docs/architecture.md) (renders Mermaid workflows)
 - **Visual Image Link**:
-  `https://raw.githubusercontent.com/<your-username>/releaseguard-agent/main/docs/images/architecture_flow.png`
+  `https://raw.githubusercontent.com/zll6796096/releaseguard-agent/main/docs/images/architecture_flow.png`
 
 ---
 

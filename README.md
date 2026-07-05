@@ -15,7 +15,7 @@ Get ReleaseGuard running locally in 3 steps:
 
 1. **Clone & Set Up Env**:
    ```bash
-   git clone https://github.com/your-username/releaseguard-agent.git
+   git clone https://github.com/zll6796096/releaseguard-agent.git
    cd releaseguard-agent
    cp .env.example .env
    # Fill in GEMINI_API_KEY inside .env
@@ -39,6 +39,14 @@ Get ReleaseGuard running locally in 3 steps:
        "diff_text": "diff --git a/app/main.py b/app/main.py"
      }'
    ```
+
+---
+
+## 🚀 Cloud Run Live Demo
+
+- **Demo Store URL**: [https://demo-store-788259830737.asia-northeast1.run.app](https://demo-store-788259830737.asia-northeast1.run.app)
+- **ReleaseGuard Agent URL**: [https://releaseguard-agent-788259830737.asia-northeast1.run.app](https://releaseguard-agent-788259830737.asia-northeast1.run.app)
+- **Demo Pull Request**: [https://github.com/zll6796096/releaseguard-agent/pull/1](https://github.com/zll6796096/releaseguard-agent/pull/1)
 
 ---
 
