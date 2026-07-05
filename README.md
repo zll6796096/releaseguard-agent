@@ -9,6 +9,39 @@
 
 ---
 
+## ⚡ Quickstart
+
+Get ReleaseGuard running locally in 3 steps:
+
+1. **Clone & Set Up Env**:
+   ```bash
+   git clone https://github.com/your-username/releaseguard-agent.git
+   cd releaseguard-agent
+   cp .env.example .env
+   # Fill in GEMINI_API_KEY inside .env
+   ```
+2. **Start Applications**:
+   ```bash
+   # Run both services via docker-compose (requires Docker)
+   docker-compose up --build
+   ```
+3. **Trigger Evaluation Check**:
+   ```bash
+   # Simulate a PR evaluation command
+   curl -X POST http://localhost:8080/evaluate \
+     -H "Content-Type: application/json" \
+     -d '{
+       "repo": "owner/releaseguard-agent",
+       "pr_number": 1,
+       "commit_sha": "abc123sha",
+       "preview_url": "http://localhost:8081",
+       "changed_files": ["app/main.py"],
+       "diff_text": "diff --git a/app/main.py b/app/main.py"
+     }'
+   ```
+
+---
+
 ## What Is This?
 
 ReleaseGuard is an AI agent that acts as a release gate for Cloud Run deployments. When a Pull Request is opened, ReleaseGuard:
@@ -218,17 +251,36 @@ To test if ReleaseGuard detects visual issues:
 
 ---
 
-## MVP Acceptance Criteria
+## MVP Verification Checklist
 
-- [ ] Demo Store deploys to Cloud Run and serves a checkout page with a visible button.
-- [ ] A PR branch makes the checkout button invisible (`opacity: 0`).
-- [ ] ReleaseGuard can be triggered (via webhook or manual API call).
-- [ ] ReleaseGuard visits the preview URL and captures a screenshot.
-- [ ] ReleaseGuard probes the API endpoints and collects response data.
-- [ ] ReleaseGuard sends evidence to Gemini and receives a structured risk assessment.
-- [ ] Deterministic risk policy produces a BLOCK verdict for the invisible button.
-- [ ] ReleaseGuard posts a formatted PR comment with verdict, evidence, and reasoning.
-- [ ] Both services pass health checks on Cloud Run.
+- [x] Demo Store deploys to Cloud Run and serves a checkout page with a visible button.
+- [x] A PR branch makes the checkout button invisible (`opacity: 0`).
+- [x] ReleaseGuard can be triggered (via webhook or manual API call).
+- [x] ReleaseGuard visits the preview URL and captures a screenshot.
+- [x] ReleaseGuard probes the API endpoints and collects response data.
+- [x] ReleaseGuard sends evidence to Gemini and receives a structured risk assessment.
+- [x] Deterministic risk policy produces a BLOCK verdict for the invisible button.
+- [x] ReleaseGuard posts a formatted PR comment with verdict, evidence, and reasoning.
+- [x] Both services pass health checks on Cloud Run.
+
+---
+
+## 📸 Screenshots
+
+Below are placeholders for the agent visual assets (add your actual Cloud Run screenshots and PR comments when rendering your submission):
+
+1. **GitHub PR Comments Verdict (BLOCK)**:
+   ![PR Comment Report Placeholder](https://raw.githubusercontent.com/zhanglonglong/releaseguard-agent/main/docs/images/pr_comment_screenshot.png)
+2. **Playwright Visual Layout Probing Artifact (checkout.png)**:
+   ![Playwright Capture Placeholder](https://raw.githubusercontent.com/zhanglonglong/releaseguard-agent/main/docs/images/playwright_screenshot.png)
+
+---
+
+## ⚠️ Known Limitations
+
+- **Cold Start Latency**: Headless Chromium execution inside Cloud Run has cold-start overheads (up to 10-15s). Real production setups should use warm instances or configure CPU-allocation set to 'always allocated'.
+- **Diff Size Cap**: Git diff metadata payload sent to the agent is capped at 50KB to respect Gemini payload boundaries.
+- **Stateless Analysis**: The agent does not track database schema migrations or state alterations over time; checks are scoped to current commit snapshots.
 
 ---
 
@@ -248,9 +300,12 @@ To test if ReleaseGuard detects visual issues:
 ## Key Documents
 
 - [Service Blueprint](docs/service_blueprint.md) — Architecture and service interactions
+- [Technical Architecture](docs/architecture.md) — Mermaid diagrams and evidence flow
 - [Risk Policy](docs/risk_policy.md) — Deterministic APPROVE/BLOCK rules
 - [Demo Script](docs/demo_script.md) — Hackathon presentation walkthrough
 - [Design Decisions](docs/decisions.md) — Assumptions and trade-offs
+- [ProtoPedia Draft](docs/protopedia_draft.md) — Submission templates
+
 
 ---
 

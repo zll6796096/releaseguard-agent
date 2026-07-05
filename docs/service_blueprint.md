@@ -1,215 +1,102 @@
 # Service Blueprint — ReleaseGuard Agent
 
-> Architecture and service interaction map for the MVP.
+This document details the service topology, endpoints, pipeline workflow, and container structures implemented for the ReleaseGuard Agent MVP.
 
-## System Overview
+---
+
+## System Architecture Overview
 
 ```
-┌──────────────┐     webhook      ┌──────────────────┐
-│   GitHub     │ ──────────────▶  │  ReleaseGuard    │
-│   (PR event) │                  │  (Cloud Run)     │
-└──────────────┘                  │                  │
-                                  │  1. Parse event  │
-                                  │  2. Deploy preview│
-                                  │  3. Collect      │
-                                  │     evidence     │
-                                  │  4. Ask Gemini   │
-                                  │  5. Apply policy │
-                                  │  6. Post comment │
-                                  └───────┬──────────┘
-                                          │
-                          ┌───────────────┼───────────────┐
-                          │               │               │
-                          ▼               ▼               ▼
-                   ┌────────────┐  ┌────────────┐  ┌────────────┐
-                   │ Demo Store │  │ Gemini API │  │ GitHub API │
-                   │ (Preview)  │  │ (Judgement) │  │ (Comment)  │
-                   │ Cloud Run  │  └────────────┘  └────────────┘
-                   └────────────┘
+ ┌──────────────┐     PR Event      ┌─────────────────────────┐
+ │   GitHub     │ ────────────────▶ │     GitHub Actions      │
+ │  (PR Event)  │                   │                         │
+ └──────────────┘                   │ 1. Checkout codebase    │
+                                    │ 2. Run call_releaseguard│
+                                    └────────────┬────────────┘
+                                                 │
+                                                 │ POST /evaluate
+                                                 ▼
+                                    ┌─────────────────────────┐
+                                    │   ReleaseGuard Agent    │
+                                    │      (Cloud Run)        │
+                                    │                         │
+                                    │ 1. api_probe            │
+                                    │ 2. secret_scan          │
+                                    │ 3. playwright_probe     │
+                                    │ 4. gemini_judge         │
+                                    │ 5. Merge risk verdicts  │
+                                    └────────────┬────────────┘
+                                                 │
+                                 ┌───────────────┼───────────────┐
+                                 │               │               │
+                                 ▼               ▼               ▼
+                          ┌────────────┐  ┌────────────┐  ┌────────────┐
+                          │ Demo Store │  │ Gemini API │  │ GitHub API │
+                          │ (Preview)  │  │ (Judgement)│  │ (Comment)  │
+                          │ Cloud Run  │  └────────────┘  └────────────┘
+                          └────────────┘
 ```
 
 ---
 
-## Services
+## Services Specification
 
-### 1. Demo Store (`apps/demo_store`)
+### 1. Demo Store Application (`apps/demo_store`)
+Simulates the core checkout flow of the business application.
 
-| Property | Value |
-|---|---|
-| Runtime | Python 3.12 / FastAPI |
-| Port | 8001 |
-| Cloud Run URL | `https://demo-store-xxxxxxxxxx.a.run.app` |
-| Purpose | Simulated e-commerce checkout page |
+- **Runtime**: Python 3.12-slim (FastAPI)
+- **Local Port**: `8081` (Dynamic `PORT` variable assigned on Cloud Run, defaulting to `8080`)
+- **Container Security**: Hardened to execute under a non-root group and user (`appuser:appgroup`).
+- **Triggerable Regression**: Set env variable `BUG_HIDE_CHECKOUT_BUTTON=true` to toggle CSS-based payment button opacity invisibility (`opacity: 0`).
 
 **Endpoints:**
-
-| Method | Path | Description |
-|---|---|---|
-| GET | `/` | Homepage with product listing |
-| GET | `/checkout` | Checkout page with form and button |
-| POST | `/checkout` | Process checkout (returns JSON) |
-| GET | `/healthz` | Health check |
-
-**Demo Bug:** The PR branch modifies `/checkout` so the checkout button has `opacity: 0`. The button exists in the DOM (selector tests pass) but is invisible to users.
+- `GET /` — Landing page.
+- `GET /checkout` — Checkout UI.
+- `GET /healthz` — Service health validator.
 
 ---
 
 ### 2. ReleaseGuard Agent (`apps/releaseguard`)
+Evaluates the release request using automated visual rendering probes and AI.
 
-| Property | Value |
-|---|---|
-| Runtime | Python 3.12 / FastAPI + Playwright |
-| Port | 8000 |
-| Cloud Run URL | `https://releaseguard-xxxxxxxxxx.a.run.app` |
-| Purpose | AI release gate agent |
+- **Runtime**: Python 3.12-slim (FastAPI + Playwright headless Chromium)
+- **Local Port**: `8080` (Dynamic `PORT` variable assigned on Cloud Run, defaulting to `8080`)
+- **Container Security**: Hardened to run Playwright Chromium under a non-root user (`appuser:appgroup`), mapping browsers locally inside `/app/ms-playwright`.
+- **Resources**: Configured with 2 vCPUs and 2Gi Memory for browser workloads.
 
 **Endpoints:**
-
-| Method | Path | Description |
-|---|---|---|
-| POST | `/webhook/github` | Receives GitHub PR webhooks |
-| POST | `/api/evaluate` | Manual trigger for evaluation |
-| GET | `/api/evaluations/{id}` | Get evaluation result |
-| GET | `/healthz` | Health check |
+- `POST /evaluate` — Processes `EvaluationRequest` payload, runs parallel scanners, executes policy merging, and returns `ReleaseDecision` JSON.
+- `GET /healthz` — Service health validator.
 
 ---
 
-## Agent Pipeline
+## Evaluation Pipeline Workflow
 
-When a PR event is received, the agent executes these steps sequentially:
+When a pull request triggers the CI pipeline:
 
-### Step 1: Event Parsing
+### Step 1: CI Context Extraction
+The GitHub Actions runner executes `scripts/call_releaseguard.py` to:
+- Read repository context, PR ID, and HEAD commit SHA.
+- Extract modified files list.
+- Extract change diff text using git commands (capped at a safe size of 50KB to respect payload limits).
+- POST the structured JSON payload to ReleaseGuard `/evaluate`.
 
-- Validate webhook signature (HMAC-SHA256).
-- Extract PR number, head SHA, branch name.
-- Filter: only act on `opened` and `synchronize` actions.
+### Step 2: Parallel Probing (Evidence Collection)
+Upon receiving the payload, the ReleaseGuard orchestrator invokes parallelized validation checks:
+- **`api_health`**: Probes target preview `/healthz`.
+- **`api_checkout`**: Checks target preview `/checkout` element selectors.
+- **`playwright_probe`**: Opens the target preview `/checkout` page inside headless Chromium, checks button computed opacity, and captures full-page visual artifacts.
+- **`secret_scan`**: Scans the incoming diff text for leaked tokens or API keys.
 
-### Step 2: Preview Deployment (MVP shortcut)
+### Step 3: Safety Override Validation
+The local rule-based engine evaluates results:
+- If a security secret leak is found, or the checkout button is missing or invisible, it enforces a **BLOCK** verdict.
+- Bypassing deterministic rules is forbidden. If a deterministic block occurs, the final verdict remains `BLOCK` even if Gemini analysis recommends approvals.
 
-For the MVP demo, we assume the preview is already deployed. In a production system, this would trigger a Cloud Build job.
+### Step 4: Gemini AI Judgement Synthesis
+- The prompt builder constructs a structured instruction containing the collected evidence list, code changes, and preliminary verdicts.
+- Calls Gemini 2.5 Flash using structured JSON mode to populate a Pydantic `GeminiJudgement` record (risk description, next steps, confidence).
+- Fallback warning outputs are generated automatically if the API key is not configured.
 
-- Construct preview URL from PR number.
-- Wait for the preview to become healthy (poll `/healthz`).
-
-### Step 3: Evidence Collection
-
-Run probes against the preview URL:
-
-| Probe | Method | What it checks |
-|---|---|---|
-| Health probe | `GET /healthz` | Service is running |
-| Checkout API probe | `POST /checkout` | API returns valid response |
-| Response time probe | Timing of above calls | Latency within bounds |
-| Screenshot probe | Playwright screenshot | Full page capture |
-| UI element probe | Playwright selectors | Critical elements exist and are visible |
-
-Evidence is collected into a structured `EvidenceReport` Pydantic model.
-
-### Step 4: Gemini Judgement
-
-- Send evidence report (including base64 screenshots) to Gemini.
-- Request structured JSON output matching the risk schema.
-- Parse and validate response with Pydantic.
-
-### Step 5: Risk Policy
-
-- Apply deterministic rules from `docs/risk_policy.md`.
-- Determine APPROVE or BLOCK.
-
-### Step 6: GitHub PR Comment
-
-- Format verdict as a Markdown comment.
-- Post via GitHub API.
-- Include evidence summary, risk scores, findings, and AI reasoning.
-
----
-
-## Data Flow
-
-```
-GitHub PR Event
-    │
-    ▼
-┌─────────────────┐
-│ WebhookHandler   │ ── validates signature, extracts PR metadata
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│ PreviewChecker   │ ── waits for preview URL to be healthy
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│ EvidenceCollector│ ── runs API + UI probes, collects evidence
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│ GeminiJudge      │ ── sends evidence to Gemini, gets risk assessment
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│ RiskPolicy       │ ── applies deterministic rules → APPROVE | BLOCK
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│ GitHubReporter   │ ── posts formatted verdict as PR comment
-└─────────────────┘
-```
-
----
-
-## Sequence Diagram
-
-```mermaid
-sequenceDiagram
-    participant GH as GitHub
-    participant RG as ReleaseGuard
-    participant DS as Demo Store (Preview)
-    participant GM as Gemini API
-
-    GH->>RG: POST /webhook/github (PR opened)
-    RG->>RG: Validate webhook, parse PR info
-    RG->>DS: GET /healthz (wait for ready)
-    DS-->>RG: 200 OK
-    RG->>DS: GET /checkout (screenshot)
-    DS-->>RG: HTML page
-    RG->>RG: Playwright renders page, captures screenshot
-    RG->>DS: POST /checkout (API probe)
-    DS-->>RG: JSON response
-    RG->>RG: Build EvidenceReport
-    RG->>GM: POST /generateContent (evidence + prompt)
-    GM-->>RG: Structured risk assessment JSON
-    RG->>RG: Apply risk policy → BLOCK
-    RG->>GH: POST /repos/.../issues/.../comments (verdict)
-```
-
----
-
-## Container Architecture
-
-### Demo Store Container
-
-```dockerfile
-FROM python:3.12-slim
-# Standard FastAPI app, ~100MB image
-```
-
-### ReleaseGuard Container
-
-```dockerfile
-FROM mcr.microsoft.com/playwright/python:v1.52.0-noble
-# Includes Chromium for screenshot probes, ~600MB image
-```
-
----
-
-## Environment Variables
-
-See `.env.example` for the full list. Key variables per service:
-
-| Service | Variable | Purpose |
-|---|---|---|
-| Both | `GCP_PROJECT_ID` | Google Cloud project |
-| ReleaseGuard | `GEMINI_API_KEY` | Gemini API access |
-| ReleaseGuard | `GITHUB_TOKEN` | GitHub API access |
-| ReleaseGuard | `GITHUB_WEBHOOK_SECRET` | Webhook validation |
-| Demo Store | `DEMO_STORE_PORT` | Listen port |
+### Step 5: Report Rendering
+The outputs are compiled into a comprehensive markdown report. GitHub Actions receives the response JSON, parses the markdown, and updates a stable comment on the PR using `actions/github-script` with the marker `<!-- releaseguard-agent-report -->`.
