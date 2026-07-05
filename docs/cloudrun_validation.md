@@ -88,6 +88,19 @@ This report documents the deployment, configuration, and verification details of
 
 ---
 
+## 🛡️ Final Code-Driven Demo PR Validation
+- **PR URL**: `<final-block-demo-pr-url-placeholder>`
+- **Preview Service URL**: `<final-preview-service-url-placeholder>`
+- **GitHub Action Run URL**: `<final-github-action-run-url-placeholder>`
+- **Verdict**: `BLOCK`
+- **Risk Score**: `90`
+- **Evidence Summary**:
+  - Checkout button was hidden unconditionally in the HTML template by the branch code.
+  - ReleaseGuard detected that the checkout button was invisible (opacity 0) on the dedicated preview service and returned a BLOCK verdict.
+  - GitHub Actions successfully posted the BLOCK report to the PR and subsequently terminated with a failure.
+
+---
+
 ## ⚠️ Known Limitations & Disclaimers
 1. **Cold Start Latency**: Headless Chromium inside Cloud Run has cold-start overheads (up to 10-15s). Configure warm instances in production.
 2. **Diff Size Cap**: Git diff payload sent to the agent is capped at 50KB to respect Gemini payload boundaries.

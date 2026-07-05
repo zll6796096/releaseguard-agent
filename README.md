@@ -92,7 +92,7 @@ Demo Store        Gemini API      GitHub API
 | Component | Technology |
 |---|---|
 | Runtime | Google Cloud Run |
-| AI | Gemini 2.5 Flash (structured output + vision) |
+| AI | Gemini 2.5 Flash (structured output + evidence synthesis) |
 | Language | Python 3.12, FastAPI |
 | Browser | Playwright (headless Chromium) |
 | Policy | Deterministic rules engine |
@@ -148,7 +148,7 @@ Demo Store        Gemini API      GitHub API
 
 ```bash
 # Clone the repo
-git clone https://github.com/your-username/releaseguard-agent.git
+git clone https://github.com/zll6796096/releaseguard-agent.git
 cd releaseguard-agent
 
 # Copy environment variables
@@ -221,13 +221,9 @@ export LOG_LEVEL="INFO"
 
 For more details on region override, log streaming, and URL verification, refer to the [Cloud Run Deployment Guide](docs/deployment.md).
 
-### Configure GitHub Webhook
+### GitHub Webhook (Future Work)
 
-1. Go to your repo → Settings → Webhooks → Add webhook
-2. Payload URL: `https://releaseguard-xxx.a.run.app/webhook/github`
-3. Content type: `application/json`
-4. Secret: your `GITHUB_WEBHOOK_SECRET`
-5. Events: Select "Pull requests"
+Direct webhook endpoints (like `POST /webhook/github` handled by the agent) are planned for a future release. The current MVP integration runs natively via GitHub Actions workflow triggers using python scripts to execute the checks.
 
 ---
 
@@ -263,7 +259,7 @@ To test if ReleaseGuard detects visual issues:
 
 - [x] Demo Store deploys to Cloud Run and serves a checkout page with a visible button.
 - [x] A PR branch makes the checkout button invisible (`opacity: 0`).
-- [x] ReleaseGuard can be triggered (via webhook or manual API call).
+- [x] ReleaseGuard can be triggered (via manual API call / GitHub Actions workflow).
 - [x] ReleaseGuard visits the preview URL and captures a screenshot.
 - [x] ReleaseGuard probes the API endpoints and collects response data.
 - [x] ReleaseGuard sends evidence to Gemini and receives a structured risk assessment.
@@ -273,14 +269,15 @@ To test if ReleaseGuard detects visual issues:
 
 ---
 
-## 📸 Screenshots
+## 🛠️ How to use this on your own project
 
-Below are placeholders for the agent visual assets (add your actual Cloud Run screenshots and PR comments when rendering your submission):
-
-1. **GitHub PR Comments Verdict (BLOCK)**:
-   ![PR Comment Report Placeholder](https://raw.githubusercontent.com/zhanglonglong/releaseguard-agent/main/docs/images/pr_comment_screenshot.png)
-2. **Playwright Visual Layout Probing Artifact (checkout.png)**:
-   ![Playwright Capture Placeholder](https://raw.githubusercontent.com/zhanglonglong/releaseguard-agent/main/docs/images/playwright_screenshot.png)
+1. **Deploy ReleaseGuard Agent**: Deploy the agent service to Google Cloud Run (providing your `GEMINI_API_KEY` and setting a secure `RELEASEGUARD_SHARED_TOKEN`).
+2. **Create Preview/Staging Env**: Ensure your target web application spins up a preview URL on pull request events.
+3. **Add `/healthz/`**: Implement a `/healthz/` endpoint in your web application that returns `200 OK` when healthy.
+4. **Mark Critical Elements**: Add unique `data-testid` attributes to critical elements in your UI (e.g. `data-testid="checkout-button"`).
+5. **Copy Workflow Action**: Copy the `.github/workflows/releaseguard.yml` and `scripts/call_releaseguard.py` script into your repository.
+6. **Configure Secrets & Variables**: Configure `RELEASEGUARD_AGENT_URL`, `RELEASEGUARD_SHARED_TOKEN`, and `RELEASEGUARD_PREVIEW_URL` in your GitHub repo settings.
+7. **Protect Branches**: Set the ReleaseGuard status check as a required branch protection rule to block pull request merges on BLOCK verdicts.
 
 ---
 
@@ -297,7 +294,7 @@ Below are placeholders for the agent visual assets (add your actual Cloud Run sc
 | Requirement | How We Meet It |
 |---|---|
 | Google Cloud runtime product | Cloud Run (both services) |
-| Google Cloud AI technology | Gemini API (vision + structured output) |
+| Google Cloud AI technology | Gemini API (structured output + evidence synthesis) |
 | Agentic behavior | Autonomous evidence collection, judgement, and action (PR comment) |
 | Public GitHub repo | ✅ |
 | Deployed project URL | Cloud Run URLs |
@@ -313,7 +310,7 @@ Below are placeholders for the agent visual assets (add your actual Cloud Run sc
 - [Demo Script](docs/demo_script.md) — Hackathon presentation walkthrough
 - [Design Decisions](docs/decisions.md) — Assumptions and trade-offs
 - [ProtoPedia Draft](docs/protopedia_draft.md) — Submission templates
-
+- [Validation Report](docs/cloudrun_validation.md) — Real Cloud Run Validation Results
 
 ---
 
@@ -321,7 +318,7 @@ Below are placeholders for the agent visual assets (add your actual Cloud Run sc
 
 **DevOps × AI Agent Hackathon 2026**
 
-Solo builder: [@zhanglonglong](https://github.com/zhanglonglong)
+Solo builder: [@zll6796096](https://github.com/zll6796096)
 
 ---
 
