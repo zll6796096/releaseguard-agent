@@ -127,50 +127,58 @@ playwright install chromium
 ### Run Locally
 
 ```bash
-# Terminal 1: Start Demo Store
+# Terminal 1: Start Demo Store (binds to 8081)
 cd apps/demo_store
-uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+uvicorn app.main:app --host 0.0.0.0 --port 8081 --reload
 
-# Terminal 2: Start ReleaseGuard
+# Terminal 2: Start ReleaseGuard (binds to 8080)
 cd apps/releaseguard
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
 ```
 
 ### Test the Agent Locally
 
 ```bash
-# Trigger a manual evaluation
-curl -X POST http://localhost:8000/api/evaluate \
+# Trigger a manual evaluation pointing to your local demo store
+curl -X POST http://localhost:8080/evaluate \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer demo-api-key-change-me" \
-  -d '{"preview_url": "http://localhost:8001", "pr_number": 1}'
+  -d '{
+    "repo": "owner/releaseguard-agent",
+    "pr_number": 1,
+    "commit_sha": "localsample123",
+    "preview_url": "http://localhost:8081",
+    "changed_files": ["app/main.py"],
+    "diff_text": "diff --git a/app/main.py b/app/main.py"
+  }'
 ```
 
 ---
 
 ## Deployment
 
-### Deploy Demo Store to Cloud Run
+We provide helper scripts under the `scripts/` directory to simplify deployment using `gcloud run deploy --source`.
 
+### Prerequisites
+
+Configure your environment variables:
 ```bash
-cd apps/demo_store
-gcloud run deploy demo-store \
-  --source . \
-  --region asia-northeast1 \
-  --allow-unauthenticated
+export GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
+export GEMINI_API_KEY="your-gemini-api-key"
+export RELEASEGUARD_SHARED_TOKEN="your-shared-security-bearer-token"
+export LOG_LEVEL="INFO"
 ```
 
-### Deploy ReleaseGuard to Cloud Run
+### Deploy Services
 
 ```bash
-cd apps/releaseguard
-gcloud run deploy releaseguard \
-  --source . \
-  --region asia-northeast1 \
-  --set-env-vars GEMINI_API_KEY=xxx,GITHUB_TOKEN=xxx \
-  --memory 1Gi \
-  --allow-unauthenticated
+# Deploy checkout Demo Store (defaults to asia-northeast1)
+./scripts/deploy_demo_store.sh
+
+# Deploy ReleaseGuard Agent
+./scripts/deploy_releaseguard.sh
 ```
+
+For more details on region override, log streaming, and URL verification, refer to the [Cloud Run Deployment Guide](docs/deployment.md).
 
 ### Configure GitHub Webhook
 
@@ -179,6 +187,34 @@ gcloud run deploy releaseguard \
 3. Content type: `application/json`
 4. Secret: your `GITHUB_WEBHOOK_SECRET`
 5. Events: Select "Pull requests"
+
+---
+
+## GitHub Actions Integration
+
+ReleaseGuard can run directly inside your GitHub repository using GitHub Actions on pull request events.
+
+### Required Repository Secrets & Variables
+
+Configure these settings in your repository under **Settings > Secrets and variables**:
+
+#### Secrets (Settings > Secrets and variables > Actions > Secrets)
+- `RELEASEGUARD_AGENT_URL`: The URL of your deployed ReleaseGuard service (e.g., `https://releaseguard-xxx.a.run.app`).
+- `RELEASEGUARD_SHARED_TOKEN`: (Optional) The bearer token configured for manual evaluation security.
+
+#### Variables (Settings > Secrets and variables > Actions > Variables)
+- `RELEASEGUARD_PREVIEW_URL`: The URL of the PR preview environment to validate (e.g., `https://demo-store-pr-xxx.run.app` or for local testing, the current demo_store IP).
+
+### How to Run the Workflow
+1. Create a pull request to the `main` branch.
+2. The `ReleaseGuard Agent Release Gate` action will automatically trigger.
+3. It collects change diffs, checks visual layouts, scans for leaked keys, applies policy checks, and comments or updates a comment with the detailed markdown report directly on your PR.
+
+### How to Simulate a Visual Regression (Bad PR)
+To test if ReleaseGuard detects visual issues:
+1. Create a branch and modify the checkout page templates.
+2. Add the CSS class `hidden-button` (which sets `opacity: 0`) to the checkout button in `apps/demo_store/app/templates/checkout.html`.
+3. Push changes and open a PR. ReleaseGuard will catch this and post a `BLOCK` verdict with a 90/100 risk score on the PR!
 
 ---
 
