@@ -27,14 +27,18 @@ Get ReleaseGuard running locally in 3 steps:
    ```
 3. **Trigger Evaluation Check**:
    ```bash
-   # Simulate a PR evaluation command
-   curl -X POST http://localhost:8080/evaluate \
+   # You can run the interactive local demo script which starts docker-compose,
+   # runs standard evaluation scenarios (clean PR, hidden button, and leaked secrets), and outputs the results:
+   ./scripts/local_demo.sh
+
+   # Alternatively, you can curl the ReleaseGuard agent directly at its mapped port 8085:
+   curl -X POST http://localhost:8085/evaluate \
      -H "Content-Type: application/json" \
      -d '{
        "repo": "owner/releaseguard-agent",
        "pr_number": 1,
        "commit_sha": "abc123sha",
-       "preview_url": "http://localhost:8081",
+       "preview_url": "http://demo_store:8080",
        "changed_files": ["app/main.py"],
        "diff_text": "diff --git a/app/main.py b/app/main.py"
      }'
@@ -44,9 +48,11 @@ Get ReleaseGuard running locally in 3 steps:
 
 ## 🚀 Cloud Run Live Demo
 
-- **Demo Store URL**: [https://demo-store-788259830737.asia-northeast1.run.app](https://demo-store-788259830737.asia-northeast1.run.app)
+- **Clean Demo Store URL**: [https://demo-store-788259830737.asia-northeast1.run.app](https://demo-store-788259830737.asia-northeast1.run.app)
 - **ReleaseGuard Agent URL**: [https://releaseguard-agent-788259830737.asia-northeast1.run.app](https://releaseguard-agent-788259830737.asia-northeast1.run.app)
-- **Demo Pull Request**: [https://github.com/zll6796096/releaseguard-agent/pull/1](https://github.com/zll6796096/releaseguard-agent/pull/1)
+- **Final BLOCK Demo PR**: [https://github.com/zll6796096/releaseguard-agent/pull/2](https://github.com/zll6796096/releaseguard-agent/pull/2)
+- **PR Preview URL**: [https://demo-store-pr-hidden-788259830737.asia-northeast1.run.app](https://demo-store-pr-hidden-788259830737.asia-northeast1.run.app)
+- **Legacy simulated demo PR**: [https://github.com/zll6796096/releaseguard-agent/pull/1](https://github.com/zll6796096/releaseguard-agent/pull/1)
 
 ---
 
@@ -73,20 +79,21 @@ A PR changes the checkout page CSS so the checkout button has `opacity: 0`. The 
 GitHub PR Event
     │
     ▼
-┌─────────────────────────────────────────────┐
-│          ReleaseGuard Agent (Cloud Run)      │
-│                                             │
-│  Webhook → Evidence Collection → Gemini     │
-│             (API + UI probes)    Judgement   │
-│                                     │       │
-│                              Risk Policy    │
-│                                     │       │
-│                              PR Comment     │
-└─────────────────────────────────────────────┘
-    │                 │                │
-    ▼                 ▼                ▼
-Demo Store        Gemini API      GitHub API
-(Preview)         (Analysis)      (Comment)
+GitHub Actions
+    │
+    ▼
+POST /evaluate
+    │
+    ▼
+ReleaseGuard Agent (Cloud Run)
+    ├─ API probe
+    ├─ Playwright UI probe
+    ├─ Secret scan
+    ├─ Gemini evidence synthesis
+    └─ Deterministic risk policy
+    │
+    ▼
+GitHub PR Comment + Failed Check on BLOCK
 ```
 
 | Component | Technology |

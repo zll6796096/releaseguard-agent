@@ -1,0 +1,46 @@
+sequenceDiagram
+    autonumber
+    actor Developer as Developer
+    participant GH as GitHub repository
+    participant GHA as GitHub Actions
+    participant DS as Demo Store (Cloud Run)
+    participant RG as ReleaseGuard Agent (Cloud Run)
+    participant Gemini as Gemini API
+
+    Developer->>GH: Push PR / Commit Changes
+    GH->>GHA: Trigger Pull Request Workflow
+    GHA->>DS: Deploy Preview Environment (or retrieve existing vars)
+    GHA->>RG: POST /evaluate (Git Diff, SHA, Preview URL)
+    
+    rect rgb(230, 240, 255)
+        note right of RG: Parallel Evidence Gathering
+        par Web Probes
+            RG->>DS: Probe GET /healthz (status code check)
+        and DOM checks
+            RG->>DS: Probe GET /checkout (verify button presence)
+        and Playwright UI checks
+            RG->>DS: Launch Headless Chromium & inspect computed CSS opacity
+            DS-->>RG: Opacity value & captures checkout.png screenshot
+        and Local scanners
+            RG->>RG: Scan Git Diff for secrets (API Keys, Tokens)
+        end
+    end
+
+    RG->>RG: Run Deterministic Risk Policy Checks
+    
+    alt Deterministic BLOCK Triggered (e.g. Secrets leak / button invisible)
+        RG->>RG: Set prelim_verdict = BLOCK (cannot be overridden)
+    else Probes Passed
+        RG->>RG: Set prelim_verdict = APPROVE
+    end
+
+    RG->>Gemini: POST generate_content (structured prompt & evidence schema)
+    Gemini-->>RG: Structured JSON (GeminiJudgement)
+
+    RG->>RG: Merge verdicts (prelim_verdict = BLOCK overrides Gemini)
+    RG->>RG: Calculate final risk score: max(prelim_risk, gemini_risk)
+    RG->>RG: Generate Markdown PR report
+
+    RG-->>GHA: Return JSON (verdict, overall_risk, report, details)
+    GHA->>GH: Post/Update PR Comment (with stable HTML marker)
+    GHA-->>Developer: View ReleaseGuard Report in PR
