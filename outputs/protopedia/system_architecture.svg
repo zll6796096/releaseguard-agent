@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+<rect width="1920" height="1080" fill="#F6F7F9"/>
+<style>
+text { font-family: "Yu Gothic", "Hiragino Sans", sans-serif; fill: #101828; }
+.h { font-size: 54px; font-weight: 700; }
+.k { font-size: 24px; font-weight: 700; fill: #0F766E; }
+.s { font-size: 28px; fill: #667085; }
+.box { fill: white; stroke: #D0D5DD; stroke-width: 3; rx: 8; }
+.label { font-size: 27px; font-weight: 700; }
+.body { font-size: 23px; }
+.note { font-size: 23px; fill: #667085; }
+.arrow { stroke: #17233D; stroke-width: 5; marker-end: url(#arrow); fill: none; }
+</style>
+<defs><marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 Z" fill="#17233D"/></marker></defs>
+<text x="90" y="95" class="k">SYSTEM ARCHITECTURE</text>
+<text x="90" y="165" class="h">ReleaseGuard Agent 実装構成</text>
+<text x="90" y="215" class="s">GitHub PR と Cloud Run プレビューを証拠化し、ReleaseDecision JSON と PR コメントを返します。</text>
+<rect x="90" y="300" width="270" height="125" class="box"/>
+<text x="114" y="342" class="label">User / Client</text>
+<text x="114" y="382" class="body">Developer / Reviewer</text>
+<rect x="430" y="300" width="310" height="125" class="box"/>
+<text x="454" y="342" class="label">Frontend</text>
+<text x="454" y="382" class="body">Demo Store Jinja2 UI</text>
+<rect x="820" y="275" width="350" height="175" class="box"/>
+<text x="844" y="317" class="label">Backend / API</text>
+<text x="844" y="357" class="body">ReleaseGuard FastAPI</text>
+<text x="844" y="391" class="body">POST /evaluate</text>
+<rect x="1250" y="285" width="350" height="145" class="box"/>
+<text x="1274" y="327" class="label">AI / External API</text>
+<text x="1274" y="367" class="body">Gemini 2.5 Flash</text>
+<rect x="820" y="555" width="350" height="190" class="box"/>
+<text x="844" y="597" class="label">Evidence Skills</text>
+<text x="844" y="637" class="body">API Probe</text>
+<text x="844" y="671" class="body">Playwright Probe</text>
+<text x="844" y="705" class="body">Secret Scan</text>
+<rect x="1250" y="555" width="350" height="160" class="box"/>
+<text x="1274" y="597" class="label">Database / Storage</text>
+<text x="1274" y="637" class="body">No persistent DB</text>
+<text x="1274" y="671" class="body">/tmp artifacts</text>
+<rect x="430" y="555" width="310" height="160" class="box"/>
+<text x="454" y="597" class="label">Authentication</text>
+<text x="454" y="637" class="body">HTTP Bearer token</text>
+<text x="454" y="671" class="body">GitHub Secrets</text>
+<rect x="650" y="845" width="620" height="105" class="box"/>
+<text x="674" y="887" class="label">Deployment / Hosting</text>
+<text x="674" y="927" class="body">Docker containers on Google Cloud Run</text>
+<path d="M360,360 L430,360" class="arrow"/>
+<path d="M740,360 L820,360" class="arrow"/>
+<path d="M995,450 L995,555" class="arrow"/>
+<path d="M1170,360 L1250,360" class="arrow"/>
+<path d="M1170,650 L1250,630" class="arrow"/>
+<path d="M740,635 L820,635" class="arrow"/>
+<path d="M995,745 L960,845" class="arrow"/>
+<text x="90" y="1010" class="note">MVP はステートレスです。永続DBは実装されておらず、スクリーンショットはコンテナ内 /tmp に一時保存します。</text></svg>

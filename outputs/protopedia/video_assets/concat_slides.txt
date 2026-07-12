@@ -1,0 +1,19 @@
+file '/Users/zhanglonglong/Projects/apps/ReleaseGuard Agent/outputs/protopedia/video_assets/slide_00_title.png'
+duration 5
+file '/Users/zhanglonglong/Projects/apps/ReleaseGuard Agent/outputs/protopedia/video_assets/slide_01_problem.png'
+duration 10
+file '/Users/zhanglonglong/Projects/apps/ReleaseGuard Agent/outputs/protopedia/video_assets/slide_02_solution.png'
+duration 10
+file '/Users/zhanglonglong/Projects/apps/ReleaseGuard Agent/outputs/protopedia/video_assets/slide_03_demo_clean.png'
+duration 8
+file '/Users/zhanglonglong/Projects/apps/ReleaseGuard Agent/outputs/protopedia/video_assets/slide_04_demo_bug.png'
+duration 8
+file '/Users/zhanglonglong/Projects/apps/ReleaseGuard Agent/outputs/protopedia/video_assets/slide_05_demo_block.png'
+duration 10
+file '/Users/zhanglonglong/Projects/apps/ReleaseGuard Agent/outputs/protopedia/video_assets/slide_06_architecture.png'
+duration 10
+file '/Users/zhanglonglong/Projects/apps/ReleaseGuard Agent/outputs/protopedia/video_assets/slide_07_value.png'
+duration 10
+file '/Users/zhanglonglong/Projects/apps/ReleaseGuard Agent/outputs/protopedia/video_assets/slide_08_end.png'
+duration 13
+file '/Users/zhanglonglong/Projects/apps/ReleaseGuard Agent/outputs/protopedia/video_assets/slide_08_end.png'

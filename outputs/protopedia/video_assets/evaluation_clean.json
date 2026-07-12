@@ -1,0 +1,66 @@
+{
+  "verdict": "APPROVE",
+  "overall_risk": 50,
+  "evidence": [
+    {
+      "category": "api_health",
+      "status": "success",
+      "message": "Service health check passed successfully.",
+      "risk_score": 0,
+      "details": {
+        "status_code": 200,
+        "body": {
+          "status": "ok"
+        }
+      }
+    },
+    {
+      "category": "api_checkout",
+      "status": "success",
+      "message": "Checkout button is present and visible to users.",
+      "risk_score": 0,
+      "details": {
+        "button_found": true,
+        "invisible": false
+      }
+    },
+    {
+      "category": "secret_scan",
+      "status": "success",
+      "message": "No credentials or secrets detected in PR diff.",
+      "risk_score": 0,
+      "details": {
+        "secrets_found": []
+      }
+    },
+    {
+      "category": "playwright_probe",
+      "status": "pass",
+      "message": "Checkout button with data-testid='checkout-button' is present and visible.",
+      "risk_score": 0,
+      "details": {
+        "screenshot_path": "/tmp/releaseguard-artifacts/checkout.png",
+        "button_found": true,
+        "is_visible": true,
+        "opacity": "1"
+      }
+    }
+  ],
+  "triggered_rules": [],
+  "markdown_report": "## 🛡️ ReleaseGuard Verdict: ✅ APPROVE\n\n**Overall Risk Score**: `50/100`\n\n### 🧠 Gemini AI Judgement Synthesis\n- **Verdict Recommendation**: `WARN`\n- **AI Risk Score**: `50/100`\n- **Confidence**: `50.0%`\n- **Analysis**: Gemini API fallback activated: GEMINI_API_KEY environment variable is not configured.\n\n- **Recommended Next Action**: Perform manual visual validation of checkout journey and code diff.\n- **Unsafe Actions Detected**:\n  - ⚠️ Relying on automatic AI validation without checking key configuration.\n\n### 🛣️ Affected Journeys\n- **Journey**: `unknown`\n\n### 📊 Evidence Summary\n\n| Category | Status | Risk Score | Message |\n| --- | --- | --- | --- |\n| `api_health` | 🟢 Passed | `0/100` | Service health check passed successfully. |\n| `api_checkout` | 🟢 Passed | `0/100` | Checkout button is present and visible to users. |\n| `secret_scan` | 🟢 Passed | `0/100` | No credentials or secrets detected in PR diff. |\n| `playwright_probe` | 🟢 Passed | `0/100` | Checkout button with data-testid='checkout-button' is present and visible. |\n\n### 📸 Playwright Screenshot Artifact\n**Path**: `/tmp/releaseguard-artifacts/checkout.png`\n\n<!-- TODO: Cloud Storage or artifact upload is needed to generate public URLs for screenshots in GitHub PR comments -->\n\n### 🔍 Detailed Findings\n\n---\n*ReleaseGuard Agent v0.1.0 • Policy: Local Rule-Based + Playwright Probing + Gemini Synthesis*",
+  "gemini_judgement": {
+    "decision": "WARN",
+    "risk_score": 50,
+    "confidence": 0.5,
+    "affected_journey": "unknown",
+    "why": "Gemini API fallback activated: GEMINI_API_KEY environment variable is not configured.",
+    "evidence": [
+      "Gemini API was skipped or failed"
+    ],
+    "safe_next_action": "Perform manual visual validation of checkout journey and code diff.",
+    "unsafe_actions": [
+      "Relying on automatic AI validation without checking key configuration."
+    ],
+    "human_approval_required": true
+  }
+}

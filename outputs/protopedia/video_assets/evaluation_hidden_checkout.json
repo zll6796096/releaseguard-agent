@@ -1,0 +1,70 @@
+{
+  "verdict": "BLOCK",
+  "overall_risk": 90,
+  "evidence": [
+    {
+      "category": "api_health",
+      "status": "success",
+      "message": "Service health check passed successfully.",
+      "risk_score": 0,
+      "details": {
+        "status_code": 200,
+        "body": {
+          "status": "ok"
+        }
+      }
+    },
+    {
+      "category": "api_checkout",
+      "status": "failure",
+      "message": "Checkout button is present in the DOM but has 'hidden-button' CSS class applied (invisible to users).",
+      "risk_score": 90,
+      "details": {
+        "button_found": true,
+        "invisible": true
+      }
+    },
+    {
+      "category": "secret_scan",
+      "status": "success",
+      "message": "No credentials or secrets detected in PR diff.",
+      "risk_score": 0,
+      "details": {
+        "secrets_found": []
+      }
+    },
+    {
+      "category": "playwright_probe",
+      "status": "fail",
+      "message": "Checkout button with data-testid='checkout-button' is not visible (invisible due to opacity: 0).",
+      "risk_score": 90,
+      "details": {
+        "screenshot_path": "/tmp/releaseguard-artifacts/checkout.png",
+        "button_found": true,
+        "is_visible": true,
+        "opacity": "0",
+        "reason": "invisible due to opacity: 0"
+      }
+    }
+  ],
+  "triggered_rules": [
+    "Rule: Checkout page failed or checkout button was missing/invisible (API).",
+    "Rule: Playwright journey check failed (checkout button is not visible or usable)."
+  ],
+  "markdown_report": "## 🛡️ ReleaseGuard Verdict: 🚫 BLOCK\n\n**Overall Risk Score**: `90/100`\n\n### ⚠️ Triggered Policy Rules\n- Rule: Checkout page failed or checkout button was missing/invisible (API).\n- Rule: Playwright journey check failed (checkout button is not visible or usable).\n\n### 🧠 Gemini AI Judgement Synthesis\n- **Verdict Recommendation**: `WARN`\n- **AI Risk Score**: `50/100`\n- **Confidence**: `50.0%`\n- **Analysis**: Gemini API fallback activated: GEMINI_API_KEY environment variable is not configured.\n\n- **Recommended Next Action**: Perform manual visual validation of checkout journey and code diff.\n- **Unsafe Actions Detected**:\n  - ⚠️ Relying on automatic AI validation without checking key configuration.\n\n### 🛣️ Affected Journeys\n- **Journey**: `unknown`\n\n### 📊 Evidence Summary\n\n| Category | Status | Risk Score | Message |\n| --- | --- | --- | --- |\n| `api_health` | 🟢 Passed | `0/100` | Service health check passed successfully. |\n| `api_checkout` | 🔴 Failed | `90/100` | Checkout button is present in the DOM but has 'hidden-button' CSS class applied (invisible to users). |\n| `secret_scan` | 🟢 Passed | `0/100` | No credentials or secrets detected in PR diff. |\n| `playwright_probe` | 🔴 Failed | `90/100` | Checkout button with data-testid='checkout-button' is not visible (invisible due to opacity: 0). |\n\n### 📸 Playwright Screenshot Artifact\n**Path**: `/tmp/releaseguard-artifacts/checkout.png`\n\n<!-- TODO: Cloud Storage or artifact upload is needed to generate public URLs for screenshots in GitHub PR comments -->\n\n### 🔍 Detailed Findings\n\n#### 🔴 Failed `api_checkout` (Risk: `90/100`)\n**Details**: Checkout button is present in the DOM but has 'hidden-button' CSS class applied (invisible to users).\n```json\n{\n  \"button_found\": true,\n  \"invisible\": true\n}\n```\n\n#### 🔴 Failed `playwright_probe` (Risk: `90/100`)\n**Details**: Checkout button with data-testid='checkout-button' is not visible (invisible due to opacity: 0).\n```json\n{\n  \"screenshot_path\": \"/tmp/releaseguard-artifacts/checkout.png\",\n  \"button_found\": true,\n  \"is_visible\": true,\n  \"opacity\": \"0\",\n  \"reason\": \"invisible due to opacity: 0\"\n}\n```\n\n---\n*ReleaseGuard Agent v0.1.0 • Policy: Local Rule-Based + Playwright Probing + Gemini Synthesis*",
+  "gemini_judgement": {
+    "decision": "WARN",
+    "risk_score": 50,
+    "confidence": 0.5,
+    "affected_journey": "unknown",
+    "why": "Gemini API fallback activated: GEMINI_API_KEY environment variable is not configured.",
+    "evidence": [
+      "Gemini API was skipped or failed"
+    ],
+    "safe_next_action": "Perform manual visual validation of checkout journey and code diff.",
+    "unsafe_actions": [
+      "Relying on automatic AI validation without checking key configuration."
+    ],
+    "human_approval_required": true
+  }
+}
