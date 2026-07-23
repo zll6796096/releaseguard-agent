@@ -1,6 +1,7 @@
 # Cloud Run Deployment Guide — ReleaseGuard Agent
 
-This guide provides instructions to deploy the checkout demo store and the ReleaseGuard Agent to Google Cloud Run, verify URLs, and monitor execution logs.
+This guide describes the guarded Git-to-Cloud-Run delivery path for the checkout demo
+store and ReleaseGuard Agent.
 
 ---
 
@@ -11,8 +12,8 @@ This guide provides instructions to deploy the checkout demo store and the Relea
    ```bash
    gcloud auth login
    ```
-3. Set up or obtain a Google Cloud project ID (configured as `GOOGLE_CLOUD_PROJECT` env var).
-4. Enable the necessary GCP APIs:
+3. Use the `zhang23-23` project and the shared least-privilege Cloud Build service account.
+4. Ensure the required GCP APIs are enabled:
    ```bash
    gcloud services enable run.googleapis.com \
                           cloudbuild.googleapis.com \
@@ -21,39 +22,34 @@ This guide provides instructions to deploy the checkout demo store and the Relea
 
 ---
 
-## Deploying Applications
+## Production delivery
 
-We use Cloud Run's source-based deployment feature (`gcloud run deploy --source`), which packages local source files, uploads them to Cloud Build, builds a secure container, and deploys it automatically.
+`releaseguard-main-cloud-run` builds both production services from `main`. The
+agent reads `releaseguard-gemini-api-key` and `releaseguard-shared-token` from
+Secret Manager. The shared token is synchronized to the GitHub Actions secret
+of the same purpose without printing it. Neither credential is passed as a
+plaintext Cloud Run value.
 
-### 1. Deploy Demo Store
+The build tests both apps, builds immutable images from the same Git commit,
+deploys no-traffic candidates, and makes the candidate agent evaluate the
+candidate clean demo. It requires `verdict=APPROVE` before either production
+traffic route changes. The promotion step verifies that the build still
+represents the tip of `main` and that neither prior production revision changed
+while the candidates were being tested. A partial traffic change is rolled back
+to both recorded previous revisions.
 
-The demo store simulates a web checkout application:
+`demo-store-pr-hidden` remains the intentionally broken PR demonstration and is
+never updated or granted to the production trigger.
+
+The former externally issued plaintext Gemini key must be revoked at its
+original issuer because this GCP project cannot prove authority over that
+external credential.
+
+Push a clean, synchronized `main` branch to run automatically. The two recovery
+helpers perform the same guarded trigger action:
 
 ```bash
-export GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
-
-# Run the deployment script (defaults to asia-northeast1 region)
 ./scripts/deploy_demo_store.sh
-```
-
-**Override region example**:
-```bash
-./scripts/deploy_demo_store.sh us-central1
-```
-
-### 2. Deploy ReleaseGuard Agent
-
-The agent requires configuring access credentials to hit the Gemini API and secure the manual validation webhook.
-
-Set your deployment env variables first:
-```bash
-export GEMINI_API_KEY="AIzaSyYourGeminiApiKeyHere"
-export RELEASEGUARD_SHARED_TOKEN="your-shared-security-bearer-token"
-export LOG_LEVEL="INFO"
-```
-
-Then run the deployment script:
-```bash
 ./scripts/deploy_releaseguard.sh
 ```
 
