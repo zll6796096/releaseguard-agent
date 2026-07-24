@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import subprocess
+from contextlib import suppress
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 CONNECT_TIMEOUT_SECONDS = "10"
 MAX_TIME_SECONDS = "60"
@@ -532,6 +535,55 @@ class CommandBackend:
             raise ReleaseFailure("shared token version returned no data")
         return token
 
+    def _authorized_post_json(
+        self, url: str, payload: str, token: str
+    ) -> dict[str, Any]:
+        """POST JSON over in-process HTTPS without exposing token in argv."""
+        parsed = urlsplit(url)
+        if parsed.scheme != "https" or not parsed.hostname:
+            raise ReleaseFailure("authorized evaluation URL must use HTTPS")
+        path = parsed.path or "/"
+        if parsed.query:
+            path = f"{path}?{parsed.query}"
+        connection = http.client.HTTPSConnection(
+            parsed.hostname,
+            parsed.port,
+            timeout=float(CONNECT_TIMEOUT_SECONDS),
+        )
+        try:
+            connection.connect()
+            if connection.sock is None:
+                raise OSError("HTTPS socket was not established")
+            connection.sock.settimeout(float(MAX_TIME_SECONDS))
+            connection.request(
+                "POST",
+                path,
+                body=payload.encode(),
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                },
+            )
+            response = connection.getresponse()
+            response_body = response.read()
+        except Exception:  # noqa: BLE001 - never echo transport/token context
+            raise ReleaseFailure(
+                "authorized evaluation HTTPS request failed"
+            ) from None
+        finally:
+            with suppress(Exception):
+                connection.close()
+        if not 200 <= response.status < 300:
+            raise ReleaseFailure(
+                f"authorized evaluation returned HTTP {response.status}"
+            )
+        try:
+            return json.loads(response_body)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            raise ReleaseFailure(
+                "authorized evaluation returned invalid JSON"
+            ) from None
+
     def _evaluation_smoke(
         self,
         demo_url: str,
@@ -569,19 +621,11 @@ class CommandBackend:
             )
 
         token = self._access_shared_token()
-        response = self._curl(
-            [
-                "-H",
-                f"Authorization: Bearer {token}",
-                "-H",
-                "Content-Type: application/json",
-                "--data-binary",
-                "@-",
-                f"{agent_url}/evaluate",
-            ],
-            input_text=payload,
+        result = self._authorized_post_json(
+            f"{agent_url}/evaluate",
+            payload,
+            token,
         )
-        result = json.loads(response)
         result_path.write_text(json.dumps(result))
         return result
 

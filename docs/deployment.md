@@ -38,6 +38,9 @@ The Cloud Build identity has the one-permission custom role
 (`secretmanager.versions.get`) only on those two ReleaseGuard secret resources.
 Its shared-token value access is likewise secret-resource scoped; it has no
 project-level Secret Manager role and cannot access the Gemini key value.
+Authenticated smoke requests are sent by the lifecycle process directly over
+verified HTTPS; the shared token is never placed in a subprocess argument,
+command string, file path, log message, or propagated exception.
 
 The build tests both apps, builds immutable images from the same Git commit,
 deploys no-traffic candidates, and makes the candidate agent evaluate the

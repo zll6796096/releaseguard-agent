@@ -1,7 +1,12 @@
 import json
 
 import pytest
-from releaseguard_cloudbuild import ReleaseFailure, ReleaseOps, ReleaseState
+from releaseguard_cloudbuild import (
+    CommandBackend,
+    ReleaseFailure,
+    ReleaseOps,
+    ReleaseState,
+)
 
 DEMO = "demo-store"
 AGENT = "releaseguard-agent"
@@ -250,3 +255,122 @@ def test_split_traffic_fails_closed():
 
     with pytest.raises(ReleaseFailure, match="exactly one 100% revision"):
         ops.assert_service_revision(DEMO, PRIOR_DEMO)
+
+
+def test_authorized_request_never_exposes_token_to_subprocess_or_error(
+    monkeypatch, caplog, tmp_path
+):
+    sentinel = "sentinel-token-that-must-never-escape"
+    observed = {}
+    subprocess_argv = []
+
+    class FakeSocket:
+        def settimeout(self, value):
+            observed["read_timeout"] = value
+
+    class FakeResponse:
+        status = 200
+
+        @staticmethod
+        def read():
+            return json.dumps(approved_result()).encode()
+
+    class SuccessfulConnection:
+        def __init__(self, host, port=None, timeout=None):
+            observed["host"] = host
+            observed["port"] = port
+            observed["connect_timeout"] = timeout
+            self.sock = FakeSocket()
+
+        def connect(self):
+            observed["connected"] = True
+
+        def request(self, method, path, body, headers):
+            observed["method"] = method
+            observed["path"] = path
+            observed["authorization"] = headers["Authorization"]
+
+        @staticmethod
+        def getresponse():
+            return FakeResponse()
+
+        @staticmethod
+        def close():
+            return None
+
+    backend = CommandBackend("project", "region", DEMO, AGENT)
+    monkeypatch.setattr(
+        "releaseguard_cloudbuild.http.client.HTTPSConnection",
+        SuccessfulConnection,
+    )
+    monkeypatch.setattr(
+        backend,
+        "_run",
+        lambda args, **kwargs: subprocess_argv.append(args) or "",
+    )
+
+    result = backend._authorized_post_json(
+        "https://agent.example.test/evaluate", "{}", sentinel
+    )
+
+    assert result["verdict"] == "APPROVE"
+    assert observed["authorization"] == f"Bearer {sentinel}"
+    assert observed["connect_timeout"] == 10.0
+    assert observed["read_timeout"] == 60.0
+    assert sentinel not in observed["path"]
+    assert not any(
+        sentinel in str(argument)
+        for argv in subprocess_argv
+        for argument in argv
+    )
+    assert sentinel not in caplog.text
+
+    curl_argv = []
+
+    def fake_curl(args, **kwargs):
+        curl_argv.append(args)
+        if any(str(argument).endswith("/checkout") for argument in args):
+            return 'data-testid="checkout-button"'
+        if "%{http_code}" in args:
+            return "401"
+        return ""
+
+    monkeypatch.setattr(backend, "_curl", fake_curl)
+    monkeypatch.setattr(backend, "_assert_health_url", lambda url: None)
+    monkeypatch.setattr(
+        backend,
+        "_payload",
+        lambda demo_url, commit: {
+            "repo": "owner/repo",
+            "commit_sha": commit,
+        },
+    )
+    monkeypatch.setattr(backend, "_access_shared_token", lambda: sentinel)
+    result_path = tmp_path / "result.json"
+    backend._evaluation_smoke(
+        "https://demo.example.test",
+        "https://agent.example.test",
+        COMMIT,
+        result_path,
+    )
+    assert not any(
+        sentinel in str(argument) for argv in curl_argv for argument in argv
+    )
+    assert sentinel not in str(result_path)
+    assert sentinel not in result_path.read_text()
+
+    class FailingConnection(SuccessfulConnection):
+        def connect(self):
+            raise RuntimeError(sentinel)
+
+    monkeypatch.setattr(
+        "releaseguard_cloudbuild.http.client.HTTPSConnection",
+        FailingConnection,
+    )
+    with pytest.raises(ReleaseFailure) as captured:
+        backend._authorized_post_json(
+            "https://agent.example.test/evaluate", "{}", sentinel
+        )
+
+    assert sentinel not in str(captured.value)
+    assert sentinel not in caplog.text
