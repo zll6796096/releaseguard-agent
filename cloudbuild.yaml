@@ -135,16 +135,47 @@ steps:
         curl -fsS --retry 8 --retry-all-errors --retry-delay 5 \
           "$$agent_url/healthz/" | grep -q '"status":"ok"'
         curl -fsS "$$agent_url/openapi.json" >/dev/null
-        payload="{\"repo\":\"zll6796096/releaseguard-agent\",\"pr_number\":0,\"commit_sha\":\"${COMMIT_SHA}\",\"preview_url\":\"$${demo_url}\",\"changed_files\":[],\"diff_text\":\"\"}"
+        curl -fsS --retry 3 --retry-all-errors --retry-delay 2 \
+          "https://api.github.com/repos/zll6796096/releaseguard-agent/commits/${COMMIT_SHA}" \
+          > /workspace/releaseguard-commit.json
+        python3 - "$$demo_url" <<'PY'
+        import json
+        import sys
+        from pathlib import Path
+
+        commit = json.loads(
+            Path("/workspace/releaseguard-commit.json").read_text()
+        )
+        assert commit["sha"] == "${COMMIT_SHA}", commit.get("sha")
+        changed_files = [item["filename"] for item in commit.get("files", [])]
+        patches = [
+            f"diff --git a/{item['filename']} b/{item['filename']}\n{item['patch']}"
+            for item in commit.get("files", [])
+            if item.get("patch")
+        ]
+        assert changed_files, "GitHub commit evidence has no changed files"
+        assert patches, "GitHub commit evidence has no reviewable patch"
+        payload = {
+            "repo": "zll6796096/releaseguard-agent",
+            "pr_number": 0,
+            "commit_sha": commit["sha"],
+            "preview_url": sys.argv[1],
+            "changed_files": changed_files,
+            "diff_text": "\n\n".join(patches)[:12000],
+        }
+        Path("/workspace/releaseguard-evaluate-payload.json").write_text(
+            json.dumps(payload)
+        )
+        PY
         unauthorized_status="$$(curl -sS -o /dev/null -w '%{http_code}' \
           -H "Content-Type: application/json" \
-          -d "$$payload" \
+          --data-binary @/workspace/releaseguard-evaluate-payload.json \
           "$$agent_url/evaluate")"
         test "$$unauthorized_status" = "401"
         curl -fsS \
           -H "Authorization: Bearer $$token" \
           -H "Content-Type: application/json" \
-          -d "$$payload" \
+          --data-binary @/workspace/releaseguard-evaluate-payload.json \
           "$$agent_url/evaluate" > /workspace/releaseguard-candidate.json
         unset token
         trap - EXIT

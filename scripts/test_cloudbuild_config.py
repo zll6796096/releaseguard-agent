@@ -24,6 +24,12 @@ required = (
     'test "$$unauthorized_status" = "401"',
     '"fallback activated" not in',
     "json.load(sys.stdin)",
+    "api.github.com/repos/zll6796096/releaseguard-agent/commits/${COMMIT_SHA}",
+    "/workspace/releaseguard-commit.json",
+    "/workspace/releaseguard-evaluate-payload.json",
+    "assert changed_files",
+    "assert patches",
+    "--data-binary",
 )
 for value in required:
     assert value in text, value
