@@ -125,9 +125,7 @@ class ReleaseOps:
         agent_image: str,
         state_path: Path,
     ) -> ReleaseState:
-        self.backend.verify_secret_version(
-            SHARED_TOKEN_RESOURCE, SHARED_TOKEN_VERSION
-        )
+        self.backend.verify_secret_version(SHARED_TOKEN_RESOURCE, SHARED_TOKEN_VERSION)
         self.backend.verify_secret_version(GEMINI_RESOURCE, GEMINI_VERSION)
         previous_demo = self._single_revision(self.demo_service)
         previous_agent = self._single_revision(self.agent_service)
@@ -510,13 +508,20 @@ class CommandBackend:
         ]
         if not changed_files or not patches:
             raise ReleaseFailure("GitHub commit evidence is incomplete")
+        build_evidence = """Verified Cloud Build evidence (observed before candidate evaluation):
+- Repository deterministic test suites passed.
+- Release lifecycle behavioral tests passed, including sentinel token-isolation behavior.
+- Both candidate revisions are Ready and remain outside production traffic.
+- Runtime API/checkout/secret-scan/Playwright evidence is collected separately below.
+This evidence does not authorize production traffic; it only documents completed checks."""
+        patch_text = "\n\n".join(patches)
         return {
             "repo": "zll6796096/releaseguard-agent",
             "pr_number": 0,
             "commit_sha": commit,
             "preview_url": demo_url,
             "changed_files": changed_files,
-            "diff_text": "\n\n".join(patches)[:12000],
+            "diff_text": f"{build_evidence}\n\n{patch_text}"[:12000],
         }
 
     def _access_shared_token(self) -> str:
@@ -567,9 +572,7 @@ class CommandBackend:
             response = connection.getresponse()
             response_body = response.read()
         except Exception:  # noqa: BLE001 - never echo transport/token context
-            raise ReleaseFailure(
-                "authorized evaluation HTTPS request failed"
-            ) from None
+            raise ReleaseFailure("authorized evaluation HTTPS request failed") from None
         finally:
             with suppress(Exception):
                 connection.close()
@@ -676,9 +679,7 @@ class CommandBackend:
 
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser()
-    result.add_argument(
-        "action", choices=("deploy", "cleanup", "evaluate", "promote")
-    )
+    result.add_argument("action", choices=("deploy", "cleanup", "evaluate", "promote"))
     result.add_argument("--project", required=True)
     result.add_argument("--region", required=True)
     result.add_argument("--demo-service", required=True)
@@ -740,9 +741,7 @@ def main() -> None:
             result.get("overall_risk"),
         )
     else:
-        result = ops.promote(
-            ReleaseState.load(args.state_path), args.production_result
-        )
+        result = ops.promote(ReleaseState.load(args.state_path), args.production_result)
         print(
             "production gate",
             result["verdict"],

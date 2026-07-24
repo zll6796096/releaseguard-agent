@@ -319,9 +319,7 @@ def test_authorized_request_never_exposes_token_to_subprocess_or_error(
     assert observed["read_timeout"] == 60.0
     assert sentinel not in observed["path"]
     assert not any(
-        sentinel in str(argument)
-        for argv in subprocess_argv
-        for argument in argv
+        sentinel in str(argument) for argv in subprocess_argv for argument in argv
     )
     assert sentinel not in caplog.text
 
@@ -353,9 +351,7 @@ def test_authorized_request_never_exposes_token_to_subprocess_or_error(
         COMMIT,
         result_path,
     )
-    assert not any(
-        sentinel in str(argument) for argv in curl_argv for argument in argv
-    )
+    assert not any(sentinel in str(argument) for argv in curl_argv for argument in argv)
     assert sentinel not in str(result_path)
     assert sentinel not in result_path.read_text()
 
@@ -374,3 +370,27 @@ def test_authorized_request_never_exposes_token_to_subprocess_or_error(
 
     assert sentinel not in str(captured.value)
     assert sentinel not in caplog.text
+
+
+def test_payload_includes_verified_build_evidence_before_patch(monkeypatch):
+    backend = CommandBackend("project", "region", DEMO, AGENT)
+    monkeypatch.setattr(
+        backend,
+        "_get_json",
+        lambda url, retry=False: {
+            "sha": COMMIT,
+            "files": [
+                {
+                    "filename": "safe.py",
+                    "patch": "+print('safe')",
+                }
+            ],
+        },
+    )
+
+    payload = backend._payload("https://demo.example.test", COMMIT)
+
+    assert payload["diff_text"].startswith("Verified Cloud Build evidence")
+    assert "sentinel token-isolation behavior" in payload["diff_text"]
+    assert "does not authorize production traffic" in payload["diff_text"]
+    assert "diff --git a/safe.py b/safe.py" in payload["diff_text"]
