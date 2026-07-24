@@ -60,7 +60,7 @@ steps:
       - -ceu
       - |
         cleanup_candidates() {
-          python scripts/releaseguard_cloudbuild.py cleanup \
+          python3 scripts/releaseguard_cloudbuild.py cleanup \
             --project="$PROJECT_ID" \
             --region="${_REGION}" \
             --demo-service="${_DEMO_SERVICE}" \
@@ -72,7 +72,7 @@ steps:
           cleanup_candidates
         }
         trap cleanup_on_error ERR
-        python scripts/releaseguard_cloudbuild.py deploy \
+        python3 scripts/releaseguard_cloudbuild.py deploy \
           --project="$PROJECT_ID" \
           --region="${_REGION}" \
           --demo-service="${_DEMO_SERVICE}" \
@@ -91,7 +91,7 @@ steps:
       - -ceu
       - |
         cleanup_candidates() {
-          python scripts/releaseguard_cloudbuild.py cleanup \
+          python3 scripts/releaseguard_cloudbuild.py cleanup \
             --project="$PROJECT_ID" \
             --region="${_REGION}" \
             --demo-service="${_DEMO_SERVICE}" \
@@ -99,7 +99,7 @@ steps:
             --tag="candidate-${SHORT_SHA}"
         }
         trap cleanup_candidates EXIT
-        python scripts/releaseguard_cloudbuild.py evaluate \
+        python3 scripts/releaseguard_cloudbuild.py evaluate \
           --project="$PROJECT_ID" \
           --region="${_REGION}" \
           --demo-service="${_DEMO_SERVICE}" \
@@ -112,7 +112,7 @@ steps:
     args:
       - -ceu
       - |
-        python scripts/releaseguard_cloudbuild.py promote \
+        python3 scripts/releaseguard_cloudbuild.py promote \
           --project="$PROJECT_ID" \
           --region="${_REGION}" \
           --demo-service="${_DEMO_SERVICE}" \

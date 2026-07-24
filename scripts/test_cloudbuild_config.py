@@ -25,6 +25,9 @@ required = (
 for value in required:
     assert value in text, value
 
+assert "python scripts/releaseguard_cloudbuild.py" not in text
+assert text.count("python3 scripts/releaseguard_cloudbuild.py") >= 5
+
 for forbidden in (
     "demo-store-pr-hidden",
     "--allow-unauthenticated",
