@@ -87,6 +87,7 @@ steps:
           --memory=2Gi \
           --cpu=2 \
           --update-labels="app=releaseguard,managed-by=cloud-build,source-commit=${COMMIT_SHA}" \
+          --remove-env-vars=GEMINI_API_KEY,RELEASEGUARD_SHARED_TOKEN \
           --update-secrets=GEMINI_API_KEY=releaseguard-gemini-api-key:latest,RELEASEGUARD_SHARED_TOKEN=releaseguard-shared-token:latest
 
         candidate_demo_revision="$$(gcloud run services describe "${_DEMO_SERVICE}" \

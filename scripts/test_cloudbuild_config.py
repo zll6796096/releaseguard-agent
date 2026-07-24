@@ -10,6 +10,7 @@ required = (
     "candidate-${SHORT_SHA}",
     "releaseguard-shared-token",
     "releaseguard-gemini-api-key",
+    "--remove-env-vars=GEMINI_API_KEY,RELEASEGUARD_SHARED_TOKEN",
     "--update-secrets",
     "/evaluate",
     '"APPROVE"',
