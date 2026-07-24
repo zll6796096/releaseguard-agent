@@ -25,10 +25,13 @@ store and ReleaseGuard Agent.
 ## Production delivery
 
 `releaseguard-main-cloud-run` builds both production services from `main`. The
-agent reads `releaseguard-gemini-api-key` and `releaseguard-shared-token` from
-Secret Manager. The shared token is synchronized to the GitHub Actions secret
-of the same purpose without printing it. Neither credential is passed as a
-plaintext Cloud Run value.
+agent pins `releaseguard-gemini-api-key:2` and
+`releaseguard-shared-token:1` from Secret Manager after checking that both
+versions are enabled using metadata only. The shared token is synchronized to
+the GitHub Actions secret of the same purpose without printing it. Neither
+credential is passed as a plaintext Cloud Run value. The existing default
+Compute runtime service account and its roles are intentionally inherited and
+are not changed by this delivery pipeline.
 
 The build tests both apps, builds immutable images from the same Git commit,
 deploys no-traffic candidates, and makes the candidate agent evaluate the
@@ -36,7 +39,11 @@ candidate clean demo. It requires `verdict=APPROVE` before either production
 traffic route changes. The promotion step verifies that the build still
 represents the tip of `main` and that neither prior production revision changed
 while the candidates were being tested. A partial traffic change is rolled back
-to both recorded previous revisions.
+to both recorded previous revisions. Candidate tags are removed after every
+evaluation outcome. The rollback boundary remains active through post-promotion
+traffic, readiness, HTTP, bearer-auth, functional checkout, and non-fallback
+Gemini checks; rollback command or verification errors fail the build and are
+reported rather than ignored.
 
 `demo-store-pr-hidden` remains the intentionally broken PR demonstration and is
 never updated or granted to the production trigger.

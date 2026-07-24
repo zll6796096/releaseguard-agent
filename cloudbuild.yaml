@@ -16,6 +16,7 @@ steps:
       - |
         pip install --disable-pip-version-check -r apps/releaseguard/requirements.txt
         PYTHONPATH=apps/releaseguard pytest apps/releaseguard/tests -v
+        PYTHONPATH=scripts pytest scripts/test_releaseguard_cloudbuild.py -v
         python scripts/test_cloudbuild_config.py
 
   - id: build-demo
@@ -58,53 +59,29 @@ steps:
     args:
       - -ceu
       - |
-        tag="candidate-${SHORT_SHA}"
-        previous_demo_revision="$$(gcloud run services describe "${_DEMO_SERVICE}" \
-          --project="$PROJECT_ID" --region="${_REGION}" \
-          --format=json |
-          python3 -c 'import json, sys; data=json.load(sys.stdin); print(next(item["revisionName"] for item in data["status"]["traffic"] if item.get("percent") == 100))')"
-        previous_agent_revision="$$(gcloud run services describe "${_AGENT_SERVICE}" \
-          --project="$PROJECT_ID" --region="${_REGION}" \
-          --format=json |
-          python3 -c 'import json, sys; data=json.load(sys.stdin); print(next(item["revisionName"] for item in data["status"]["traffic"] if item.get("percent") == 100))')"
-        printf 'previous_demo_revision=%q\nprevious_agent_revision=%q\n' \
-          "$$previous_demo_revision" "$$previous_agent_revision" \
-          > /workspace/releaseguard-previous-traffic.env
-
-        gcloud run deploy "${_DEMO_SERVICE}" \
+        cleanup_candidates() {
+          python scripts/releaseguard_cloudbuild.py cleanup \
+            --project="$PROJECT_ID" \
+            --region="${_REGION}" \
+            --demo-service="${_DEMO_SERVICE}" \
+            --agent-service="${_AGENT_SERVICE}" \
+            --tag="candidate-${SHORT_SHA}"
+        }
+        cleanup_on_error() {
+          trap - ERR
+          cleanup_candidates
+        }
+        trap cleanup_on_error ERR
+        python scripts/releaseguard_cloudbuild.py deploy \
           --project="$PROJECT_ID" \
           --region="${_REGION}" \
-          --image="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_DEMO_SERVICE}:${COMMIT_SHA}" \
-          --no-traffic \
-          --tag="$$tag" \
-          --update-labels="app=releaseguard,managed-by=cloud-build,source-commit=${COMMIT_SHA}" \
-          --update-env-vars=BUG_HIDE_CHECKOUT_BUTTON=false
-
-        gcloud run deploy "${_AGENT_SERVICE}" \
-          --project="$PROJECT_ID" \
-          --region="${_REGION}" \
-          --image="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_AGENT_SERVICE}:${COMMIT_SHA}" \
-          --no-traffic \
-          --tag="$$tag" \
-          --memory=2Gi \
-          --cpu=2 \
-          --update-labels="app=releaseguard,managed-by=cloud-build,source-commit=${COMMIT_SHA}" \
-          --remove-env-vars=GEMINI_API_KEY,RELEASEGUARD_SHARED_TOKEN \
-          --update-secrets=GEMINI_API_KEY=releaseguard-gemini-api-key:latest,RELEASEGUARD_SHARED_TOKEN=releaseguard-shared-token:latest
-
-        candidate_demo_revision="$$(gcloud run services describe "${_DEMO_SERVICE}" \
-          --project="$PROJECT_ID" --region="${_REGION}" \
-          --format=json |
-          python3 -c 'import json, sys; data=json.load(sys.stdin); print(next(item["revisionName"] for item in data["status"]["traffic"] if item.get("tag") == sys.argv[1]))' "$$tag")"
-        candidate_agent_revision="$$(gcloud run services describe "${_AGENT_SERVICE}" \
-          --project="$PROJECT_ID" --region="${_REGION}" \
-          --format=json |
-          python3 -c 'import json, sys; data=json.load(sys.stdin); print(next(item["revisionName"] for item in data["status"]["traffic"] if item.get("tag") == sys.argv[1]))' "$$tag")"
-        test -n "$$candidate_demo_revision"
-        test -n "$$candidate_agent_revision"
-        printf 'candidate_demo_revision=%q\ncandidate_agent_revision=%q\n' \
-          "$$candidate_demo_revision" "$$candidate_agent_revision" \
-          > /workspace/releaseguard-candidate-revisions.env
+          --demo-service="${_DEMO_SERVICE}" \
+          --agent-service="${_AGENT_SERVICE}" \
+          --commit="${COMMIT_SHA}" \
+          --tag="candidate-${SHORT_SHA}" \
+          --demo-image="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_DEMO_SERVICE}:${COMMIT_SHA}" \
+          --agent-image="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_AGENT_SERVICE}:${COMMIT_SHA}"
+        trap - ERR
     waitFor: [push-demo, push-agent]
 
   - id: evaluate-candidates
@@ -113,83 +90,20 @@ steps:
     args:
       - -ceu
       - |
-        tag="candidate-${SHORT_SHA}"
-        demo_url="$$(gcloud run services describe "${_DEMO_SERVICE}" \
-          --project="$PROJECT_ID" --region="${_REGION}" \
-          --format=json |
-          python3 -c 'import json, sys; data=json.load(sys.stdin); print(next(item["url"] for item in data["status"]["traffic"] if item.get("tag") == sys.argv[1]))' "$$tag")"
-        agent_url="$$(gcloud run services describe "${_AGENT_SERVICE}" \
-          --project="$PROJECT_ID" --region="${_REGION}" \
-          --format=json |
-          python3 -c 'import json, sys; data=json.load(sys.stdin); print(next(item["url"] for item in data["status"]["traffic"] if item.get("tag") == sys.argv[1]))' "$$tag")"
-        test -n "$$demo_url"
-        test -n "$$agent_url"
-
-        token="$$(gcloud secrets versions access latest \
-          --secret=releaseguard-shared-token \
-          --project="$PROJECT_ID")"
-        trap 'unset token' EXIT
-        curl -fsS --retry 8 --retry-all-errors --retry-delay 5 \
-          "$$demo_url/healthz/" | grep -q '"status":"ok"'
-        curl -fsS "$$demo_url/" >/dev/null
-        curl -fsS --retry 8 --retry-all-errors --retry-delay 5 \
-          "$$agent_url/healthz/" | grep -q '"status":"ok"'
-        curl -fsS "$$agent_url/openapi.json" >/dev/null
-        curl -fsS --retry 3 --retry-all-errors --retry-delay 2 \
-          "https://api.github.com/repos/zll6796096/releaseguard-agent/commits/${COMMIT_SHA}" \
-          > /workspace/releaseguard-commit.json
-        python3 - "$$demo_url" <<'PY'
-        import json
-        import sys
-        from pathlib import Path
-
-        commit = json.loads(
-            Path("/workspace/releaseguard-commit.json").read_text()
-        )
-        assert commit["sha"] == "${COMMIT_SHA}", commit.get("sha")
-        changed_files = [item["filename"] for item in commit.get("files", [])]
-        patches = [
-            f"diff --git a/{item['filename']} b/{item['filename']}\n{item['patch']}"
-            for item in commit.get("files", [])
-            if item.get("patch")
-        ]
-        assert changed_files, "GitHub commit evidence has no changed files"
-        assert patches, "GitHub commit evidence has no reviewable patch"
-        payload = {
-            "repo": "zll6796096/releaseguard-agent",
-            "pr_number": 0,
-            "commit_sha": commit["sha"],
-            "preview_url": sys.argv[1],
-            "changed_files": changed_files,
-            "diff_text": "\n\n".join(patches)[:12000],
+        cleanup_candidates() {
+          python scripts/releaseguard_cloudbuild.py cleanup \
+            --project="$PROJECT_ID" \
+            --region="${_REGION}" \
+            --demo-service="${_DEMO_SERVICE}" \
+            --agent-service="${_AGENT_SERVICE}" \
+            --tag="candidate-${SHORT_SHA}"
         }
-        Path("/workspace/releaseguard-evaluate-payload.json").write_text(
-            json.dumps(payload)
-        )
-        PY
-        unauthorized_status="$$(curl -sS -o /dev/null -w '%{http_code}' \
-          -H "Content-Type: application/json" \
-          --data-binary @/workspace/releaseguard-evaluate-payload.json \
-          "$$agent_url/evaluate")"
-        test "$$unauthorized_status" = "401"
-        curl -fsS \
-          -H "Authorization: Bearer $$token" \
-          -H "Content-Type: application/json" \
-          --data-binary @/workspace/releaseguard-evaluate-payload.json \
-          "$$agent_url/evaluate" > /workspace/releaseguard-candidate.json
-        unset token
-        trap - EXIT
-        python3 - <<'PY'
-        import json
-        from pathlib import Path
-
-        result = json.loads(Path("/workspace/releaseguard-candidate.json").read_text())
-        assert result["verdict"] == "APPROVE", result
-        assert isinstance(result["evidence"], list) and result["evidence"], result
-        why = result["gemini_judgement"]["why"].lower()
-        assert "fallback activated" not in why, result["gemini_judgement"]
-        print("candidate verdict", result["verdict"], "risk", result["overall_risk"])
-        PY
+        trap cleanup_candidates EXIT
+        python scripts/releaseguard_cloudbuild.py evaluate \
+          --project="$PROJECT_ID" \
+          --region="${_REGION}" \
+          --demo-service="${_DEMO_SERVICE}" \
+          --agent-service="${_AGENT_SERVICE}"
     waitFor: [deploy-candidates]
 
   - id: promote
@@ -198,41 +112,11 @@ steps:
     args:
       - -ceu
       - |
-        source /workspace/releaseguard-previous-traffic.env
-        source /workspace/releaseguard-candidate-revisions.env
-
-        remote_main="$$(curl -fsS \
-          https://api.github.com/repos/zll6796096/releaseguard-agent/commits/main |
-          python3 -c 'import json, sys; print(json.load(sys.stdin)["sha"])')"
-        test "$$remote_main" = "${COMMIT_SHA}"
-
-        current_demo_revision="$$(gcloud run services describe "${_DEMO_SERVICE}" \
-          --project="$PROJECT_ID" --region="${_REGION}" \
-          --format=json |
-          python3 -c 'import json, sys; data=json.load(sys.stdin); print(next(item["revisionName"] for item in data["status"]["traffic"] if item.get("percent") == 100))')"
-        current_agent_revision="$$(gcloud run services describe "${_AGENT_SERVICE}" \
-          --project="$PROJECT_ID" --region="${_REGION}" \
-          --format=json |
-          python3 -c 'import json, sys; data=json.load(sys.stdin); print(next(item["revisionName"] for item in data["status"]["traffic"] if item.get("percent") == 100))')"
-        test "$$current_demo_revision" = "$$previous_demo_revision"
-        test "$$current_agent_revision" = "$$previous_agent_revision"
-
-        rollback() {
-          gcloud run services update-traffic "${_AGENT_SERVICE}" \
-            --project="$PROJECT_ID" --region="${_REGION}" \
-            --to-revisions="$$previous_agent_revision=100" || true
-          gcloud run services update-traffic "${_DEMO_SERVICE}" \
-            --project="$PROJECT_ID" --region="${_REGION}" \
-            --to-revisions="$$previous_demo_revision=100" || true
-        }
-        trap rollback ERR
-        gcloud run services update-traffic "${_DEMO_SERVICE}" \
-          --project="$PROJECT_ID" --region="${_REGION}" \
-          --to-revisions="$$candidate_demo_revision=100"
-        gcloud run services update-traffic "${_AGENT_SERVICE}" \
-          --project="$PROJECT_ID" --region="${_REGION}" \
-          --to-revisions="$$candidate_agent_revision=100"
-        trap - ERR
+        python scripts/releaseguard_cloudbuild.py promote \
+          --project="$PROJECT_ID" \
+          --region="${_REGION}" \
+          --demo-service="${_DEMO_SERVICE}" \
+          --agent-service="${_AGENT_SERVICE}"
     waitFor: [evaluate-candidates]
 
 substitutions:
@@ -240,6 +124,8 @@ substitutions:
   _AR_REPO: apps
   _DEMO_SERVICE: demo-store
   _AGENT_SERVICE: releaseguard-agent
+
+timeout: 1800s
 
 options:
   logging: CLOUD_LOGGING_ONLY

@@ -1,10 +1,12 @@
-from typing import List, Tuple
-from app.models import EvidenceItem
+from app.models import EvidenceItem, PolicyDecision
+
 
 class RiskPolicy:
     """Applies deterministic rules to decide whether to APPROVE or BLOCK a release."""
 
-    def decide(self, evidence: List[EvidenceItem]) -> Tuple[str, List[str], int]:
+    def decide(
+        self, evidence: list[EvidenceItem]
+    ) -> tuple[PolicyDecision, list[str], int]:
         """Applies release criteria rules over the gathered evidence items.
 
         Rules:

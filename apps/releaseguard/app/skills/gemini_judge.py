@@ -33,7 +33,8 @@ class GeminiJudge:
             evidence=["Gemini API was skipped or failed"],
             safe_next_action="Perform manual visual validation of checkout journey and code diff.",
             unsafe_actions=["Relying on automatic AI validation without checking key configuration."],
-            human_approval_required=True
+            human_approval_required=True,
+            is_fallback=True,
         )
 
     async def judge(

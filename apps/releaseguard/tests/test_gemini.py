@@ -1,8 +1,11 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-from app.models import EvaluationRequest, EvidenceItem, GeminiJudgement, ReleaseDecision
-from app.skills.gemini_judge import GeminiJudge
+from app.models import EvaluationRequest, EvidenceItem, GeminiJudgement
 from app.orchestrator import EvaluationOrchestrator
+from app.skills.gemini_judge import GeminiJudge
+from pydantic import ValidationError
+
 
 @pytest.mark.asyncio
 async def test_gemini_judge_missing_key():
@@ -21,6 +24,7 @@ async def test_gemini_judge_missing_key():
         assert result.decision == "WARN"
         assert "Gemini API fallback activated" in result.why
         assert result.human_approval_required is True
+        assert result.is_fallback is True
 
 @pytest.mark.asyncio
 async def test_gemini_judge_api_failure():
@@ -126,3 +130,97 @@ async def test_orchestrator_gemini_blocks_when_preliminary_approves():
     assert decision.verdict == "BLOCK"
     assert decision.overall_risk == 75 # Max of 0 (prelim) and 75 (Gemini)
     assert any("Gemini AI recommended BLOCK due to high risk." in rule for rule in decision.triggered_rules)
+
+
+def _clean_orchestrator(judgement: GeminiJudgement, *, risk_score: int = 0):
+    orchestrator = EvaluationOrchestrator()
+    probe = AsyncMock()
+    probe.evaluate.return_value = [
+        EvidenceItem(
+            category="api_checkout",
+            status="success",
+            message="Visible",
+            risk_score=risk_score,
+        )
+    ]
+    orchestrator.probes = [probe]
+    judge = AsyncMock()
+    judge.judge.return_value = judgement
+    orchestrator.judge = judge
+    return orchestrator
+
+
+def _judgement(
+    *,
+    decision: str = "APPROVE",
+    human_approval_required: bool = False,
+    is_fallback: bool = False,
+) -> GeminiJudgement:
+    return GeminiJudgement(
+        decision=decision,
+        risk_score=0,
+        confidence=1.0,
+        affected_journey="checkout",
+        why="Evidence is complete",
+        evidence=["All checks passed"],
+        safe_next_action="Keep monitoring",
+        unsafe_actions=[],
+        human_approval_required=human_approval_required,
+        is_fallback=is_fallback,
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "judgement",
+    [
+        _judgement(decision="WARN"),
+        _judgement(human_approval_required=True),
+        _judgement(is_fallback=True),
+    ],
+    ids=["gemini-warn", "human-required", "fallback"],
+)
+async def test_orchestrator_fails_closed_without_explicit_gemini_approval(judgement):
+    decision = await _clean_orchestrator(judgement).evaluate(
+        EvaluationRequest(
+            repo="owner/repo",
+            pr_number=1,
+            commit_sha="abc",
+            preview_url="http://test",
+        )
+    )
+
+    assert decision.verdict == "BLOCK"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_fails_closed_when_deterministic_policy_warns():
+    decision = await _clean_orchestrator(_judgement(), risk_score=60).evaluate(
+        EvaluationRequest(
+            repo="owner/repo",
+            pr_number=1,
+            commit_sha="abc",
+            preview_url="http://test",
+        )
+    )
+
+    assert decision.verdict == "BLOCK"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_approves_only_explicit_dual_approval():
+    decision = await _clean_orchestrator(_judgement()).evaluate(
+        EvaluationRequest(
+            repo="owner/repo",
+            pr_number=1,
+            commit_sha="abc",
+            preview_url="http://test",
+        )
+    )
+
+    assert decision.verdict == "APPROVE"
+
+
+def test_gemini_decision_rejects_unknown_value():
+    with pytest.raises(ValidationError):
+        _judgement(decision="UNKNOWN")

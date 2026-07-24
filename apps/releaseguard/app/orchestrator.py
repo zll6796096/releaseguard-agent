@@ -1,22 +1,19 @@
 import asyncio
-from typing import List
-from app.models import EvaluationRequest, ReleaseDecision, EvidenceItem
+
+from app.models import EvaluationRequest, EvidenceItem, ReleaseDecision
+from app.report import ReportGenerator
 from app.skills.api_probe import ApiProbe
-from app.skills.secret_scan import SecretScan
+from app.skills.gemini_judge import GeminiJudge
 from app.skills.playwright_probe import PlaywrightProbe
 from app.skills.risk_policy import RiskPolicy
-from app.skills.gemini_judge import GeminiJudge
-from app.report import ReportGenerator
+from app.skills.secret_scan import SecretScan
+
 
 class EvaluationOrchestrator:
     """Orchestrates evidence collection skills, risk evaluation, and report generation."""
 
     def __init__(self):
-        self.probes = [
-            ApiProbe(),
-            SecretScan(),
-            PlaywrightProbe()
-        ]
+        self.probes = [ApiProbe(), SecretScan(), PlaywrightProbe()]
         self.policy = RiskPolicy()
         self.judge = GeminiJudge()
         self.reporter = ReportGenerator()
@@ -32,28 +29,41 @@ class EvaluationOrchestrator:
         """
         # Execute all probes in parallel
         tasks = [probe.evaluate(request) for probe in self.probes]
-        results: List[List[EvidenceItem]] = await asyncio.gather(*tasks)
-        
+        results: list[list[EvidenceItem]] = await asyncio.gather(*tasks)
+
         # Flatten the list of evidence
-        flat_evidence: List[EvidenceItem] = []
+        flat_evidence: list[EvidenceItem] = []
         for res_list in results:
             flat_evidence.extend(res_list)
 
         # Apply deterministic rules first
-        prelim_verdict, triggered_rules, prelim_risk = self.policy.decide(flat_evidence)
+        prelim_verdict, triggered_rules, prelim_risk = self.policy.decide(
+            flat_evidence
+        )
 
         # Call Gemini Judge to synthesize evidence
-        gemini_judgement = await self.judge.judge(request, flat_evidence, prelim_verdict)
+        gemini_judgement = await self.judge.judge(
+            request, flat_evidence, prelim_verdict
+        )
 
-        # Do not let Gemini override deterministic BLOCK
-        # Final decision is BLOCK if either prelim or Gemini says BLOCK (or FIX_PR, ESCALATE)
-        final_verdict = prelim_verdict
-        if prelim_verdict != "BLOCK":
-            if gemini_judgement.decision in ("BLOCK", "ESCALATE", "FIX_PR"):
-                final_verdict = "BLOCK"
-                triggered_rules.append(f"Rule: Gemini AI recommended {gemini_judgement.decision} due to high risk.")
-            else:
-                final_verdict = "APPROVE"
+        # Fail closed unless both independent gates explicitly approve. A WARN,
+        # human-review requirement, or fallback judgement is not release authority.
+        gate_failures = []
+        if prelim_verdict != "APPROVE":
+            gate_failures.append(
+                f"Rule: Deterministic policy did not explicitly APPROVE ({prelim_verdict})."
+            )
+        if gemini_judgement.decision != "APPROVE":
+            gate_failures.append(
+                f"Rule: Gemini AI recommended {gemini_judgement.decision} due to high risk."
+            )
+        if gemini_judgement.human_approval_required:
+            gate_failures.append("Rule: Gemini judgement requires human approval.")
+        if gemini_judgement.is_fallback:
+            gate_failures.append("Rule: Gemini fallback judgement cannot authorize release.")
+
+        triggered_rules.extend(gate_failures)
+        final_verdict = "BLOCK" if gate_failures else "APPROVE"
 
         # Final risk score = max of deterministic risk score and Gemini risk score
         final_risk = max(prelim_risk, gemini_judgement.risk_score)
@@ -64,7 +74,7 @@ class EvaluationOrchestrator:
             overall_risk=final_risk,
             evidence=flat_evidence,
             triggered_rules=triggered_rules,
-            gemini_judgement=gemini_judgement
+            gemini_judgement=gemini_judgement,
         )
 
         return ReleaseDecision(
@@ -73,5 +83,5 @@ class EvaluationOrchestrator:
             evidence=flat_evidence,
             triggered_rules=triggered_rules,
             markdown_report=markdown_report,
-            gemini_judgement=gemini_judgement
+            gemini_judgement=gemini_judgement,
         )
