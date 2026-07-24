@@ -23,6 +23,7 @@ required = (
     "unauthorized_status",
     'test "$$unauthorized_status" = "401"',
     '"fallback activated" not in',
+    "json.load(sys.stdin)",
 )
 for value in required:
     assert value in text, value
@@ -30,6 +31,8 @@ for value in required:
 assert "demo-store-pr-hidden" not in text
 assert "--allow-unauthenticated" not in text
 assert "git ls-remote" not in text
+assert "status.traffic[tag=" not in text
+assert "status.traffic[percent=100]" not in text
 assert not re.search(r"--(?:set|update)-env-vars[^\n]*GEMINI_API_KEY", text)
 assert not re.search(r"--(?:set|update)-env-vars[^\n]*RELEASEGUARD_SHARED_TOKEN", text)
 

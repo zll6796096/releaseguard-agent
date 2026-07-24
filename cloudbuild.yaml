@@ -61,10 +61,12 @@ steps:
         tag="candidate-${SHORT_SHA}"
         previous_demo_revision="$$(gcloud run services describe "${_DEMO_SERVICE}" \
           --project="$PROJECT_ID" --region="${_REGION}" \
-          --format='value(status.traffic[percent=100].revisionName)')"
+          --format=json |
+          python3 -c 'import json, sys; data=json.load(sys.stdin); print(next(item["revisionName"] for item in data["status"]["traffic"] if item.get("percent") == 100))')"
         previous_agent_revision="$$(gcloud run services describe "${_AGENT_SERVICE}" \
           --project="$PROJECT_ID" --region="${_REGION}" \
-          --format='value(status.traffic[percent=100].revisionName)')"
+          --format=json |
+          python3 -c 'import json, sys; data=json.load(sys.stdin); print(next(item["revisionName"] for item in data["status"]["traffic"] if item.get("percent") == 100))')"
         printf 'previous_demo_revision=%q\nprevious_agent_revision=%q\n' \
           "$$previous_demo_revision" "$$previous_agent_revision" \
           > /workspace/releaseguard-previous-traffic.env
@@ -92,10 +94,12 @@ steps:
 
         candidate_demo_revision="$$(gcloud run services describe "${_DEMO_SERVICE}" \
           --project="$PROJECT_ID" --region="${_REGION}" \
-          --format="value(status.traffic[tag=$$tag].revisionName)")"
+          --format=json |
+          python3 -c 'import json, sys; data=json.load(sys.stdin); print(next(item["revisionName"] for item in data["status"]["traffic"] if item.get("tag") == sys.argv[1]))' "$$tag")"
         candidate_agent_revision="$$(gcloud run services describe "${_AGENT_SERVICE}" \
           --project="$PROJECT_ID" --region="${_REGION}" \
-          --format="value(status.traffic[tag=$$tag].revisionName)")"
+          --format=json |
+          python3 -c 'import json, sys; data=json.load(sys.stdin); print(next(item["revisionName"] for item in data["status"]["traffic"] if item.get("tag") == sys.argv[1]))' "$$tag")"
         test -n "$$candidate_demo_revision"
         test -n "$$candidate_agent_revision"
         printf 'candidate_demo_revision=%q\ncandidate_agent_revision=%q\n' \
@@ -112,10 +116,12 @@ steps:
         tag="candidate-${SHORT_SHA}"
         demo_url="$$(gcloud run services describe "${_DEMO_SERVICE}" \
           --project="$PROJECT_ID" --region="${_REGION}" \
-          --format="value(status.traffic[tag=$$tag].url)")"
+          --format=json |
+          python3 -c 'import json, sys; data=json.load(sys.stdin); print(next(item["url"] for item in data["status"]["traffic"] if item.get("tag") == sys.argv[1]))' "$$tag")"
         agent_url="$$(gcloud run services describe "${_AGENT_SERVICE}" \
           --project="$PROJECT_ID" --region="${_REGION}" \
-          --format="value(status.traffic[tag=$$tag].url)")"
+          --format=json |
+          python3 -c 'import json, sys; data=json.load(sys.stdin); print(next(item["url"] for item in data["status"]["traffic"] if item.get("tag") == sys.argv[1]))' "$$tag")"
         test -n "$$demo_url"
         test -n "$$agent_url"
 
@@ -171,10 +177,12 @@ steps:
 
         current_demo_revision="$$(gcloud run services describe "${_DEMO_SERVICE}" \
           --project="$PROJECT_ID" --region="${_REGION}" \
-          --format='value(status.traffic[percent=100].revisionName)')"
+          --format=json |
+          python3 -c 'import json, sys; data=json.load(sys.stdin); print(next(item["revisionName"] for item in data["status"]["traffic"] if item.get("percent") == 100))')"
         current_agent_revision="$$(gcloud run services describe "${_AGENT_SERVICE}" \
           --project="$PROJECT_ID" --region="${_REGION}" \
-          --format='value(status.traffic[percent=100].revisionName)')"
+          --format=json |
+          python3 -c 'import json, sys; data=json.load(sys.stdin); print(next(item["revisionName"] for item in data["status"]["traffic"] if item.get("percent") == 100))')"
         test "$$current_demo_revision" = "$$previous_demo_revision"
         test "$$current_agent_revision" = "$$previous_agent_revision"
 
