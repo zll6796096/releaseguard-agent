@@ -9,6 +9,7 @@ lifecycle_text = (root / "scripts" / "releaseguard_cloudbuild.py").read_text(
 behavior_test_text = (root / "scripts" / "test_releaseguard_cloudbuild.py").read_text(
     encoding="utf-8"
 )
+deployment_text = (root / "docs" / "deployment.md").read_text(encoding="utf-8")
 
 required = (
     "${COMMIT_SHA}",
@@ -78,6 +79,13 @@ for test_name in (
     "test_candidate_evaluation_failure_always_cleans_tags_and_preserves_production",
 ):
     assert test_name in behavior_test_text
+
+for value in (
+    "appsSecretVersionMetadataReader",
+    "secretmanager.versions.get",
+    "project-level Secret Manager role",
+):
+    assert value in deployment_text
 
 for script_name in ("deploy_releaseguard.sh", "deploy_demo_store.sh"):
     script = (root / "scripts" / script_name).read_text(encoding="utf-8")

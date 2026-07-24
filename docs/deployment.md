@@ -33,6 +33,12 @@ credential is passed as a plaintext Cloud Run value. The existing default
 Compute runtime service account and its roles are intentionally inherited and
 are not changed by this delivery pipeline.
 
+The Cloud Build identity has the one-permission custom role
+`appsSecretVersionMetadataReader`
+(`secretmanager.versions.get`) only on those two ReleaseGuard secret resources.
+Its shared-token value access is likewise secret-resource scoped; it has no
+project-level Secret Manager role and cannot access the Gemini key value.
+
 The build tests both apps, builds immutable images from the same Git commit,
 deploys no-traffic candidates, and makes the candidate agent evaluate the
 candidate clean demo. It requires `verdict=APPROVE` before either production
